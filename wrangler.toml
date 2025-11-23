@@ -1,5 +1,6 @@
 /**
  * Temporary File Drop - Cloudflare Worker with R2
+ * Enhanced with Device Pairing & Link Sharing
  * 
  * Setup Instructions:
  * 1. Create an R2 bucket in your Cloudflare dashboard
@@ -25,7 +26,7 @@ export default {
     try {
       // Route handling
       if (request.method === 'GET' && url.pathname === '/') {
-        return serveHTML();
+        return serveHTML(request);
       }
       
       if (request.method === 'POST' && url.pathname === '/upload') {
@@ -55,7 +56,15 @@ export default {
 /**
  * Serve the HTML UI
  */
-function serveHTML() {
+function serveHTML(request) {
+  // Generate or retrieve device ID from cookie
+  const cookies = request.headers.get('Cookie') || '';
+  let deviceId = cookies.match(/deviceId=([^;]+)/)?.[1];
+  
+  if (!deviceId) {
+    deviceId = generateDeviceId();
+  }
+  
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -84,7 +93,7 @@ function serveHTML() {
       border-radius: 16px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
       padding: 40px;
-      max-width: 500px;
+      max-width: 550px;
       width: 100%;
     }
     
@@ -96,8 +105,102 @@ function serveHTML() {
     
     .subtitle {
       color: #666;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
       font-size: 14px;
+    }
+    
+    .device-info {
+      background: #f0f9ff;
+      border: 2px solid #7dd3fc;
+      border-radius: 8px;
+      padding: 12px 15px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .device-label {
+      font-size: 13px;
+      color: #0c4a6e;
+      font-weight: 600;
+    }
+    
+    .device-code {
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: bold;
+      color: #0369a1;
+      letter-spacing: 1px;
+    }
+    
+    .mode-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .mode-btn {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #ddd;
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+    
+    .mode-btn.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: #667eea;
+    }
+    
+    .mode-btn:hover:not(.active) {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+    
+    .section {
+      display: none;
+    }
+    
+    .section.active {
+      display: block;
+    }
+    
+    .input-group {
+      margin-bottom: 15px;
+    }
+    
+    .input-label {
+      display: block;
+      margin-bottom: 6px;
+      color: #555;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    
+    .input-label .optional {
+      color: #999;
+      font-weight: normal;
+      font-size: 12px;
+    }
+    
+    input[type="text"], input[type="url"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    
+    input[type="text"]:focus, input[type="url"]:focus {
+      outline: none;
+      border-color: #667eea;
     }
     
     .upload-area {
@@ -107,7 +210,7 @@ function serveHTML() {
       text-align: center;
       transition: all 0.3s;
       cursor: pointer;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
     }
     
     .upload-area:hover, .upload-area.drag-over {
@@ -210,6 +313,7 @@ function serveHTML() {
       border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
+      white-space: nowrap;
     }
     
     .copy-btn:hover {
@@ -218,6 +322,12 @@ function serveHTML() {
     
     .warning {
       color: #dc2626;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+    
+    .info {
+      color: #0369a1;
       font-size: 13px;
       margin-top: 10px;
     }
@@ -250,27 +360,75 @@ function serveHTML() {
       color: #666;
       font-size: 14px;
     }
+    
+    .hint {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>📤 Temporary File Drop</h1>
-    <p class="subtitle">Share files instantly. Links expire in 2 hours.</p>
+    <p class="subtitle">Share files & links instantly. Expires in 2 hours.</p>
     
-    <div class="upload-area" id="uploadArea">
-      <div class="upload-icon">📁</div>
-      <p><strong>Click to select</strong> or drag and drop</p>
-      <p style="font-size: 12px; color: #999; margin-top: 5px;">Max size: 100MB</p>
+    <div class="device-info">
+      <div>
+        <div class="device-label">Your Device Code:</div>
+      </div>
+      <div class="device-code" id="deviceCode">${deviceId}</div>
     </div>
     
-    <input type="file" id="fileInput">
-    
-    <div class="file-info" id="fileInfo" style="display: none;">
-      <div class="file-name" id="fileName"></div>
-      <div class="file-size" id="fileSize"></div>
+    <div class="mode-selector">
+      <button class="mode-btn active" id="fileModeBtn">📁 File Upload</button>
+      <button class="mode-btn" id="linkModeBtn">🔗 Share Link</button>
     </div>
     
-    <button class="btn" id="uploadBtn" disabled>Select a file first</button>
+    <!-- File Upload Section -->
+    <div class="section active" id="fileSection">
+      <div class="input-group">
+        <label class="input-label">
+          Target Device Code <span class="optional">(optional)</span>
+        </label>
+        <input type="text" id="targetDeviceFile" placeholder="Enter device code to restrict access">
+        <div class="hint">Leave empty for public access</div>
+      </div>
+      
+      <div class="upload-area" id="uploadArea">
+        <div class="upload-icon">📁</div>
+        <p><strong>Click to select</strong> or drag and drop</p>
+        <p style="font-size: 12px; color: #999; margin-top: 5px;">Max size: 100MB</p>
+      </div>
+      
+      <input type="file" id="fileInput">
+      
+      <div class="file-info" id="fileInfo" style="display: none;">
+        <div class="file-name" id="fileName"></div>
+        <div class="file-size" id="fileSize"></div>
+      </div>
+      
+      <button class="btn" id="uploadBtn" disabled>Select a file first</button>
+    </div>
+    
+    <!-- Link Share Section -->
+    <div class="section" id="linkSection">
+      <div class="input-group">
+        <label class="input-label">
+          Target Device Code <span class="optional">(optional)</span>
+        </label>
+        <input type="text" id="targetDeviceLink" placeholder="Enter device code to restrict access">
+        <div class="hint">Leave empty for public access</div>
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">Link URL</label>
+        <input type="url" id="linkUrl" placeholder="https://example.com">
+        <div class="hint">Enter the URL you want to share</div>
+      </div>
+      
+      <button class="btn" id="shareLinkBtn">Share Link</button>
+    </div>
     
     <div class="progress" id="progress">
       <div class="progress-bar">
@@ -280,40 +438,74 @@ function serveHTML() {
     </div>
     
     <div class="result" id="result">
-      <h3>✅ File uploaded successfully!</h3>
-      <p style="margin: 10px 0; color: #166534;">Share this link:</p>
+      <h3 id="resultTitle">✅ Success!</h3>
+      <p style="margin: 10px 0; color: #166534;" id="resultMessage">Share this link:</p>
       <div class="link-box">
         <input type="text" class="link-input" id="downloadLink" readonly>
         <button class="copy-btn" id="copyBtn">Copy</button>
       </div>
       <p class="warning">⚠️ This link will expire in 2 hours</p>
+      <p class="info" id="pairingInfo" style="display: none;">🔒 Only accessible by device: <strong id="pairedDevice"></strong></p>
     </div>
     
     <div class="error" id="error"></div>
   </div>
 
   <script>
+    // Set device ID cookie
+    const deviceId = '${deviceId}';
+    document.cookie = \`deviceId=\${deviceId}; path=/; max-age=\${365*24*60*60}; SameSite=Lax\`;
+    
+    // Elements
     const fileInput = document.getElementById('fileInput');
     const uploadArea = document.getElementById('uploadArea');
     const uploadBtn = document.getElementById('uploadBtn');
+    const fileModeBtn = document.getElementById('fileModeBtn');
+    const linkModeBtn = document.getElementById('linkModeBtn');
+    const fileSection = document.getElementById('fileSection');
+    const linkSection = document.getElementById('linkSection');
+    const shareLinkBtn = document.getElementById('shareLinkBtn');
+    const linkUrl = document.getElementById('linkUrl');
+    const targetDeviceFile = document.getElementById('targetDeviceFile');
+    const targetDeviceLink = document.getElementById('targetDeviceLink');
     const progress = document.getElementById('progress');
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
     const result = document.getElementById('result');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultMessage = document.getElementById('resultMessage');
     const downloadLink = document.getElementById('downloadLink');
     const copyBtn = document.getElementById('copyBtn');
     const errorDiv = document.getElementById('error');
     const fileInfo = document.getElementById('fileInfo');
     const fileName = document.getElementById('fileName');
     const fileSize = document.getElementById('fileSize');
+    const pairingInfo = document.getElementById('pairingInfo');
+    const pairedDevice = document.getElementById('pairedDevice');
     
     let selectedFile = null;
     const MAX_SIZE = 100 * 1024 * 1024; // 100MB
     
-    // Click to select file
+    // Mode switching
+    fileModeBtn.addEventListener('click', () => {
+      fileModeBtn.classList.add('active');
+      linkModeBtn.classList.remove('active');
+      fileSection.classList.add('active');
+      linkSection.classList.remove('active');
+      resetUI();
+    });
+    
+    linkModeBtn.addEventListener('click', () => {
+      linkModeBtn.classList.add('active');
+      fileModeBtn.classList.remove('active');
+      linkSection.classList.add('active');
+      fileSection.classList.remove('active');
+      resetUI();
+    });
+    
+    // File upload handlers
     uploadArea.addEventListener('click', () => fileInput.click());
     
-    // Drag and drop handlers
     uploadArea.addEventListener('dragover', (e) => {
       e.preventDefault();
       uploadArea.classList.add('drag-over');
@@ -364,6 +556,12 @@ function serveHTML() {
       
       const formData = new FormData();
       formData.append('file', selectedFile);
+      formData.append('deviceId', deviceId);
+      
+      const targetDevice = targetDeviceFile.value.trim();
+      if (targetDevice) {
+        formData.append('targetDevice', targetDevice);
+      }
       
       uploadBtn.disabled = true;
       progress.style.display = 'block';
@@ -384,14 +582,14 @@ function serveHTML() {
         xhr.addEventListener('load', () => {
           if (xhr.status === 200) {
             const data = JSON.parse(xhr.responseText);
-            downloadLink.value = data.downloadUrl;
-            result.style.display = 'block';
+            showSuccess(data.downloadUrl, targetDevice, 'File uploaded successfully!');
             progress.style.display = 'none';
             uploadBtn.disabled = false;
             uploadBtn.textContent = 'Upload Another File';
             fileInfo.style.display = 'none';
             selectedFile = null;
             fileInput.value = '';
+            targetDeviceFile.value = '';
           } else {
             const error = JSON.parse(xhr.responseText);
             showError(error.error || 'Upload failed');
@@ -416,6 +614,63 @@ function serveHTML() {
       }
     });
     
+    // Link sharing handler
+    shareLinkBtn.addEventListener('click', async () => {
+      const url = linkUrl.value.trim();
+      
+      if (!url) {
+        showError('Please enter a URL');
+        return;
+      }
+      
+      try {
+        new URL(url); // Validate URL
+      } catch {
+        showError('Please enter a valid URL (must start with http:// or https://)');
+        return;
+      }
+      
+      const targetDevice = targetDeviceLink.value.trim();
+      
+      shareLinkBtn.disabled = true;
+      progress.style.display = 'block';
+      progressText.textContent = 'Creating link...';
+      progressFill.style.width = '100%';
+      result.style.display = 'none';
+      errorDiv.style.display = 'none';
+      
+      try {
+        const formData = new FormData();
+        formData.append('link', url);
+        formData.append('deviceId', deviceId);
+        
+        if (targetDevice) {
+          formData.append('targetDevice', targetDevice);
+        }
+        
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          showSuccess(data.downloadUrl, targetDevice, 'Link created successfully!');
+          linkUrl.value = '';
+          targetDeviceLink.value = '';
+        } else {
+          showError(data.error || 'Failed to create link');
+        }
+        
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        progress.style.display = 'none';
+        shareLinkBtn.disabled = false;
+      }
+    });
+    
     copyBtn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(downloadLink.value);
@@ -434,68 +689,129 @@ function serveHTML() {
       }
     });
     
+    function showSuccess(url, targetDevice, title) {
+      resultTitle.textContent = '✅ ' + title;
+      downloadLink.value = url;
+      result.style.display = 'block';
+      
+      if (targetDevice) {
+        pairingInfo.style.display = 'block';
+        pairedDevice.textContent = targetDevice;
+      } else {
+        pairingInfo.style.display = 'none';
+      }
+    }
+    
     function showError(message) {
       errorDiv.textContent = '❌ ' + message;
       errorDiv.style.display = 'block';
+    }
+    
+    function resetUI() {
+      result.style.display = 'none';
+      errorDiv.style.display = 'none';
+      progress.style.display = 'none';
+      fileInfo.style.display = 'none';
+      selectedFile = null;
+      fileInput.value = '';
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = 'Select a file first';
     }
   </script>
 </body>
 </html>`;
   
-  return new Response(html, {
-    headers: { 'Content-Type': 'text/html;charset=UTF-8' }
-  });
+  const headers = new Headers({ 'Content-Type': 'text/html;charset=UTF-8' });
+  
+  // Set device ID cookie if not present
+  if (!cookies.includes('deviceId=')) {
+    headers.set('Set-Cookie', `deviceId=${deviceId}; Path=/; Max-Age=${365*24*60*60}; SameSite=Lax`);
+  }
+  
+  return new Response(html, { headers });
 }
 
 /**
- * Handle file upload
+ * Handle file upload or link share
  */
 async function handleUpload(request, env) {
   try {
     const formData = await request.formData();
     const file = formData.get('file');
+    const link = formData.get('link');
+    const deviceId = formData.get('deviceId') || 'unknown';
+    const targetDevice = formData.get('targetDevice') || '';
     
-    if (!file) {
-      return new Response(JSON.stringify({ error: 'No file provided' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    
-    // Check file size
-    if (file.size > CONFIG.MAX_FILE_SIZE) {
-      return new Response(JSON.stringify({ error: 'File too large. Maximum size is 100MB.' }), {
+    // Validate that either file or link is provided
+    if (!file && !link) {
+      return new Response(JSON.stringify({ error: 'No file or link provided' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
     
     // Generate unique ID
-    const fileId = generateId();
+    const itemId = generateId();
     const timestamp = Date.now();
     const expiresAt = timestamp + (CONFIG.EXPIRY_HOURS * 60 * 60 * 1000);
     
-    // Store file in R2 with metadata
-    const fileData = await file.arrayBuffer();
-    await env.FILE_BUCKET.put(fileId, fileData, {
-      httpMetadata: {
-        contentType: file.type || 'application/octet-stream'
-      },
-      customMetadata: {
-        originalName: file.name,
-        uploadedAt: timestamp.toString(),
-        expiresAt: expiresAt.toString()
+    if (link) {
+      // Handle link share
+      const linkData = JSON.stringify({
+        type: 'link',
+        url: link,
+        uploadedBy: deviceId,
+        targetDevice: targetDevice,
+        uploadedAt: timestamp,
+        expiresAt: expiresAt
+      });
+      
+      await env.FILE_BUCKET.put(itemId, linkData, {
+        httpMetadata: {
+          contentType: 'application/json'
+        },
+        customMetadata: {
+          type: 'link',
+          uploadedBy: deviceId,
+          targetDevice: targetDevice,
+          uploadedAt: timestamp.toString(),
+          expiresAt: expiresAt.toString()
+        }
+      });
+    } else {
+      // Handle file upload
+      if (file.size > CONFIG.MAX_FILE_SIZE) {
+        return new Response(JSON.stringify({ error: 'File too large. Maximum size is 100MB.' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
-    });
+      
+      const fileData = await file.arrayBuffer();
+      await env.FILE_BUCKET.put(itemId, fileData, {
+        httpMetadata: {
+          contentType: file.type || 'application/octet-stream'
+        },
+        customMetadata: {
+          type: 'file',
+          originalName: file.name,
+          uploadedBy: deviceId,
+          targetDevice: targetDevice,
+          uploadedAt: timestamp.toString(),
+          expiresAt: expiresAt.toString()
+        }
+      });
+    }
     
     // Generate download URL
-    const downloadUrl = new URL(`/download/${fileId}`, request.url).toString();
+    const downloadUrl = new URL(`/download/${itemId}`, request.url).toString();
     
     return new Response(JSON.stringify({
       success: true,
-      fileId: fileId,
+      itemId: itemId,
       downloadUrl: downloadUrl,
-      expiresAt: new Date(expiresAt).toISOString()
+      expiresAt: new Date(expiresAt).toISOString(),
+      targetDevice: targetDevice || null
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
@@ -510,28 +826,57 @@ async function handleUpload(request, env) {
 }
 
 /**
- * Handle file download
+ * Handle file download or link redirect
  */
 async function handleDownload(request, env, url) {
-  const fileId = url.pathname.split('/download/')[1];
+  const itemId = url.pathname.split('/download/')[1];
   
-  if (!fileId) {
+  if (!itemId) {
     return new Response('Invalid download link', { status: 400 });
   }
   
   try {
-    const object = await env.FILE_BUCKET.get(fileId);
+    const object = await env.FILE_BUCKET.get(itemId);
     
     if (!object) {
       return new Response('File not found or expired', { status: 404 });
     }
     
-    // Check if file has expired
+    // Check if item has expired
     const expiresAt = parseInt(object.customMetadata?.expiresAt || '0');
     if (expiresAt && Date.now() > expiresAt) {
-      // Delete expired file
-      await env.FILE_BUCKET.delete(fileId);
-      return new Response('File has expired', { status: 410 });
+      await env.FILE_BUCKET.delete(itemId);
+      return new Response('Link has expired', { status: 410 });
+    }
+    
+    // Check device pairing
+    const targetDevice = object.customMetadata?.targetDevice || '';
+    if (targetDevice) {
+      const cookies = request.headers.get('Cookie') || '';
+      const requestDeviceId = cookies.match(/deviceId=([^;]+)/)?.[1];
+      
+      if (!requestDeviceId || requestDeviceId !== targetDevice) {
+        return new Response('Access denied. This item is restricted to a specific device.', { 
+          status: 403,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
+    }
+    
+    // Check if this is a link redirect
+    const itemType = object.customMetadata?.type || 'file';
+    
+    if (itemType === 'link') {
+      const linkData = JSON.parse(await object.text());
+      
+      // Redirect to the stored link
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': linkData.url,
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+      });
     }
     
     // Return file with appropriate headers
@@ -584,4 +929,16 @@ function generateId() {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result + '-' + Date.now();
+}
+
+/**
+ * Generate a unique device ID (6-character code)
+ */
+function generateDeviceId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Remove ambiguous characters
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
