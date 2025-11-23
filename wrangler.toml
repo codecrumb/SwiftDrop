@@ -1,0 +1,587 @@
+/**
+ * Temporary File Drop - Cloudflare Worker with R2
+ * 
+ * Setup Instructions:
+ * 1. Create an R2 bucket in your Cloudflare dashboard
+ * 2. In wrangler.toml, add:
+ *    [[r2_buckets]]
+ *    binding = "FILE_BUCKET"
+ *    bucket_name = "your-bucket-name"
+ * 3. Deploy with: wrangler deploy
+ */
+
+// Configuration
+const CONFIG = {
+  MAX_FILE_SIZE: 100 * 1024 * 1024, // 100MB limit
+  EXPIRY_HOURS: 2, // Files expire after 2 hours
+  CLEANUP_INTERVAL: 3600000 // Cleanup check every hour (in ms)
+};
+
+// Main request handler
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    
+    try {
+      // Route handling
+      if (request.method === 'GET' && url.pathname === '/') {
+        return serveHTML();
+      }
+      
+      if (request.method === 'POST' && url.pathname === '/upload') {
+        return handleUpload(request, env);
+      }
+      
+      if (request.method === 'GET' && url.pathname.startsWith('/download/')) {
+        return handleDownload(request, env, url);
+      }
+      
+      return new Response('Not Found', { status: 404 });
+    } catch (error) {
+      console.error('Error:', error);
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  },
+  
+  // Scheduled cleanup of expired files
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(cleanupExpiredFiles(env));
+  }
+};
+
+/**
+ * Serve the HTML UI
+ */
+function serveHTML() {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Temporary File Drop</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .upload-area {
+      border: 3px dashed #ddd;
+      border-radius: 12px;
+      padding: 40px 20px;
+      text-align: center;
+      transition: all 0.3s;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    
+    .upload-area:hover, .upload-area.drag-over {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+    
+    .upload-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+    
+    input[type="file"] {
+      display: none;
+    }
+    
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: transform 0.2s;
+    }
+    
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .progress {
+      margin: 20px 0;
+      display: none;
+    }
+    
+    .progress-bar {
+      height: 8px;
+      background: #eee;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s;
+      width: 0%;
+    }
+    
+    .progress-text {
+      text-align: center;
+      margin-top: 8px;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .result {
+      display: none;
+      background: #f0fdf4;
+      border: 2px solid #86efac;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .result h3 {
+      color: #166534;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    
+    .link-box {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .link-input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #86efac;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: monospace;
+    }
+    
+    .copy-btn {
+      background: #166534;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    
+    .copy-btn:hover {
+      background: #14532d;
+    }
+    
+    .warning {
+      color: #dc2626;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+    
+    .error {
+      background: #fef2f2;
+      border: 2px solid #fca5a5;
+      color: #991b1b;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      display: none;
+    }
+    
+    .file-info {
+      margin: 15px 0;
+      padding: 15px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+    
+    .file-name {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 5px;
+      word-break: break-all;
+    }
+    
+    .file-size {
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📤 Temporary File Drop</h1>
+    <p class="subtitle">Share files instantly. Links expire in 2 hours.</p>
+    
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">📁</div>
+      <p><strong>Click to select</strong> or drag and drop</p>
+      <p style="font-size: 12px; color: #999; margin-top: 5px;">Max size: 100MB</p>
+    </div>
+    
+    <input type="file" id="fileInput">
+    
+    <div class="file-info" id="fileInfo" style="display: none;">
+      <div class="file-name" id="fileName"></div>
+      <div class="file-size" id="fileSize"></div>
+    </div>
+    
+    <button class="btn" id="uploadBtn" disabled>Select a file first</button>
+    
+    <div class="progress" id="progress">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-text" id="progressText">Uploading...</div>
+    </div>
+    
+    <div class="result" id="result">
+      <h3>✅ File uploaded successfully!</h3>
+      <p style="margin: 10px 0; color: #166534;">Share this link:</p>
+      <div class="link-box">
+        <input type="text" class="link-input" id="downloadLink" readonly>
+        <button class="copy-btn" id="copyBtn">Copy</button>
+      </div>
+      <p class="warning">⚠️ This link will expire in 2 hours</p>
+    </div>
+    
+    <div class="error" id="error"></div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadArea = document.getElementById('uploadArea');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const progress = document.getElementById('progress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const result = document.getElementById('result');
+    const downloadLink = document.getElementById('downloadLink');
+    const copyBtn = document.getElementById('copyBtn');
+    const errorDiv = document.getElementById('error');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    
+    let selectedFile = null;
+    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+    
+    // Click to select file
+    uploadArea.addEventListener('click', () => fileInput.click());
+    
+    // Drag and drop handlers
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('drag-over');
+    });
+    
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('drag-over');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('drag-over');
+      if (e.dataTransfer.files.length > 0) {
+        handleFileSelect(e.dataTransfer.files[0]);
+      }
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+      }
+    });
+    
+    function handleFileSelect(file) {
+      if (file.size > MAX_SIZE) {
+        showError('File is too large. Maximum size is 100MB.');
+        return;
+      }
+      
+      selectedFile = file;
+      fileName.textContent = file.name;
+      fileSize.textContent = formatFileSize(file.size);
+      fileInfo.style.display = 'block';
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload File';
+      result.style.display = 'none';
+      errorDiv.style.display = 'none';
+    }
+    
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+    
+    uploadBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      
+      uploadBtn.disabled = true;
+      progress.style.display = 'block';
+      result.style.display = 'none';
+      errorDiv.style.display = 'none';
+      
+      try {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = (e.loaded / e.total) * 100;
+            progressFill.style.width = percent + '%';
+            progressText.textContent = 'Uploading... ' + Math.round(percent) + '%';
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            downloadLink.value = data.downloadUrl;
+            result.style.display = 'block';
+            progress.style.display = 'none';
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload Another File';
+            fileInfo.style.display = 'none';
+            selectedFile = null;
+            fileInput.value = '';
+          } else {
+            const error = JSON.parse(xhr.responseText);
+            showError(error.error || 'Upload failed');
+            progress.style.display = 'none';
+            uploadBtn.disabled = false;
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          showError('Network error. Please try again.');
+          progress.style.display = 'none';
+          uploadBtn.disabled = false;
+        });
+        
+        xhr.open('POST', '/upload');
+        xhr.send(formData);
+        
+      } catch (error) {
+        showError(error.message);
+        progress.style.display = 'none';
+        uploadBtn.disabled = false;
+      }
+    });
+    
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(downloadLink.value);
+        const originalText = copyBtn.textContent;
+        copyBtn.textContent = '✓ Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = originalText;
+        }, 2000);
+      } catch (error) {
+        downloadLink.select();
+        document.execCommand('copy');
+        copyBtn.textContent = '✓ Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy';
+        }, 2000);
+      }
+    });
+    
+    function showError(message) {
+      errorDiv.textContent = '❌ ' + message;
+      errorDiv.style.display = 'block';
+    }
+  </script>
+</body>
+</html>`;
+  
+  return new Response(html, {
+    headers: { 'Content-Type': 'text/html;charset=UTF-8' }
+  });
+}
+
+/**
+ * Handle file upload
+ */
+async function handleUpload(request, env) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file');
+    
+    if (!file) {
+      return new Response(JSON.stringify({ error: 'No file provided' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Check file size
+    if (file.size > CONFIG.MAX_FILE_SIZE) {
+      return new Response(JSON.stringify({ error: 'File too large. Maximum size is 100MB.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Generate unique ID
+    const fileId = generateId();
+    const timestamp = Date.now();
+    const expiresAt = timestamp + (CONFIG.EXPIRY_HOURS * 60 * 60 * 1000);
+    
+    // Store file in R2 with metadata
+    const fileData = await file.arrayBuffer();
+    await env.FILE_BUCKET.put(fileId, fileData, {
+      httpMetadata: {
+        contentType: file.type || 'application/octet-stream'
+      },
+      customMetadata: {
+        originalName: file.name,
+        uploadedAt: timestamp.toString(),
+        expiresAt: expiresAt.toString()
+      }
+    });
+    
+    // Generate download URL
+    const downloadUrl = new URL(`/download/${fileId}`, request.url).toString();
+    
+    return new Response(JSON.stringify({
+      success: true,
+      fileId: fileId,
+      downloadUrl: downloadUrl,
+      expiresAt: new Date(expiresAt).toISOString()
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    return new Response(JSON.stringify({ error: 'Upload failed: ' + error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Handle file download
+ */
+async function handleDownload(request, env, url) {
+  const fileId = url.pathname.split('/download/')[1];
+  
+  if (!fileId) {
+    return new Response('Invalid download link', { status: 400 });
+  }
+  
+  try {
+    const object = await env.FILE_BUCKET.get(fileId);
+    
+    if (!object) {
+      return new Response('File not found or expired', { status: 404 });
+    }
+    
+    // Check if file has expired
+    const expiresAt = parseInt(object.customMetadata?.expiresAt || '0');
+    if (expiresAt && Date.now() > expiresAt) {
+      // Delete expired file
+      await env.FILE_BUCKET.delete(fileId);
+      return new Response('File has expired', { status: 410 });
+    }
+    
+    // Return file with appropriate headers
+    const headers = new Headers();
+    headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
+    headers.set('Content-Disposition', `attachment; filename="${object.customMetadata?.originalName || 'download'}"`);
+    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    
+    return new Response(object.body, { headers });
+    
+  } catch (error) {
+    console.error('Download error:', error);
+    return new Response('Download failed: ' + error.message, { status: 500 });
+  }
+}
+
+/**
+ * Clean up expired files (called by cron trigger)
+ */
+async function cleanupExpiredFiles(env) {
+  try {
+    const list = await env.FILE_BUCKET.list();
+    const now = Date.now();
+    let deletedCount = 0;
+    
+    for (const object of list.objects) {
+      const fullObject = await env.FILE_BUCKET.get(object.key);
+      if (fullObject) {
+        const expiresAt = parseInt(fullObject.customMetadata?.expiresAt || '0');
+        if (expiresAt && now > expiresAt) {
+          await env.FILE_BUCKET.delete(object.key);
+          deletedCount++;
+        }
+      }
+    }
+    
+    console.log(`Cleanup completed: ${deletedCount} expired files deleted`);
+  } catch (error) {
+    console.error('Cleanup error:', error);
+  }
+}
+
+/**
+ * Generate a unique ID for files
+ */
+function generateId() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 16; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result + '-' + Date.now();
+}
