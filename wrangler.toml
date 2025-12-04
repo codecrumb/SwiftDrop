@@ -1,21 +1,25 @@
 name = "swiftdrop"
-account_id = "your-account-id"
+account_id = "REDACTED"
 workers_dev = true
 compatibility_date = "2024-11-24"
 main = "worker.js"
 
+# Durable Object for WebSocket signaling
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "SignalingRoom"
+
+# R2 bucket for fallback file storage
 [[r2_buckets]]
-binding = "FILE_BUCKET"
+binding = "FILE_STORAGE"
 bucket_name = "swiftdrop"
 
-[[durable_objects.bindings]]
-name = "SSE_CONNECTIONS"
-class_name = "SSEConnectionManager"
-
+# Durable Object migrations
 [[migrations]]
 tag = "v1"
-new_classes = ["SSEConnectionManager"]
+new_classes = ["SignalingRoom"]
 
+# Observability settings
 [observability]
 [observability.logs]
 enabled = false
