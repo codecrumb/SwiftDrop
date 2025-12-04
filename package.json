@@ -1,0 +1,34 @@
+{
+  "name": "swiftdrop",
+  "version": "1.0.0",
+  "description": "P2P file transfer with WebRTC and R2 fallback on Cloudflare Workers",
+  "main": "worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "tail": "wrangler tail",
+    "tail:json": "wrangler tail --format json",
+    "r2:list": "wrangler r2 bucket list",
+    "r2:create": "wrangler r2 bucket create swiftdrop-files",
+    "r2:delete": "wrangler r2 bucket delete swiftdrop-files",
+    "deployments": "wrangler deployments list",
+    "whoami": "wrangler whoami",
+    "delete": "wrangler delete"
+  },
+  "keywords": [
+    "p2p",
+    "file-transfer",
+    "webrtc",
+    "cloudflare",
+    "workers",
+    "durable-objects",
+    "r2"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
