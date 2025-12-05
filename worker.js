@@ -60,7 +60,7 @@ export default {
             roomCode,
             fileName: fileName || file.name,
             uploadedAt: timestamp.toString(),
-            expiresAt: (timestamp + 24 * 60 * 60 * 1000).toString() // 24 hours
+            expiresAt: (timestamp + 20 * 60 * 1000).toString() // 20 minutes
           }
         });
         
@@ -110,7 +110,14 @@ export default {
         headers.set('Content-Disposition', `attachment; filename="${object.customMetadata?.fileName || 'download'}"`);
         headers.set('Access-Control-Allow-Origin', '*');
         
-        return new Response(object.body, { headers });
+        // Store body as we can only read it once
+        const body = object.body;
+        
+        // Delete file immediately after serving (cleanup)
+        // Fire and forget - don't await to avoid blocking response
+        env.FILE_STORAGE.delete(fileId).catch(err => console.error('Cleanup error:', err));
+        
+        return new Response(body, { headers });
       } catch (error) {
         console.error('Download error:', error);
         return new Response('Download failed', { status: 500 });
@@ -571,7 +578,7 @@ function getHTML() {
 <body>
   <div class="container">
     <h1>🚀 SwiftDrop</h1>
-    <p class="subtitle">Instant P2P file transfer • No server storage</p>
+    <p class="subtitle">Instant P2P file transfer • Files auto-delete after download</p>
     
     <div class="status" id="status">
       <div id="statusText">Generating room code...</div>
@@ -581,14 +588,15 @@ function getHTML() {
     
     <div class="mode-selector">
       <button class="mode-btn active" id="sendModeBtn">📤 Send File</button>
-      <button class="mode-btn" id="receiveModeBtn">📥 Receive File</button>
+      <button class="mode-btn" id="urlModeBtn">🔗 Send URL</button>
+      <button class="mode-btn" id="receiveModeBtn">📥 Receive</button>
     </div>
     
     <!-- Send Mode -->
     <div class="section active" id="sendSection">
       <div class="upload-area" id="uploadArea">
         <div class="upload-icon">📁</div>
-        <p><strong>Click to select a file</strong></p>
+        <p><strong>Click or drag to select a file</strong></p>
         <p style="font-size: 12px; color: #999; margin-top: 5px;">Direct P2P transfer</p>
       </div>
       <input type="file" id="fileInput">
@@ -599,6 +607,17 @@ function getHTML() {
       </div>
       
       <button class="btn" id="sendBtn" disabled>Waiting for receiver...</button>
+    </div>
+    
+    <!-- URL Mode -->
+    <div class="section" id="urlSection">
+      <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter URL to share:</p>
+      <input type="text" id="urlInput" placeholder="https://example.com" 
+             style="text-transform: none; letter-spacing: normal; margin-bottom: 20px;">
+      <button class="btn" id="sendUrlBtn" disabled>Waiting for receiver...</button>
+      <p style="margin-top: 10px; font-size: 12px; color: #999; text-align: center;">
+        Receiver will be redirected to this URL
+      </p>
     </div>
     
     <!-- Receive Mode -->
@@ -631,9 +650,12 @@ function getHTML() {
     const CONFIG = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' }
       ],
-      p2pTimeout: 5000, // 5 seconds to establish P2P
+      p2pTimeout: 10000, // 10 seconds to establish P2P
       chunkSize: 16384 // 16KB chunks
     };
     
@@ -658,8 +680,10 @@ function getHTML() {
     const roomCodeEl = document.getElementById('roomCode');
     const peerInfo = document.getElementById('peerInfo');
     const sendModeBtn = document.getElementById('sendModeBtn');
+    const urlModeBtn = document.getElementById('urlModeBtn');
     const receiveModeBtn = document.getElementById('receiveModeBtn');
     const sendSection = document.getElementById('sendSection');
+    const urlSection = document.getElementById('urlSection');
     const receiveSection = document.getElementById('receiveSection');
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
@@ -667,6 +691,8 @@ function getHTML() {
     const fileNameEl = document.getElementById('fileName');
     const fileSizeEl = document.getElementById('fileSize');
     const sendBtn = document.getElementById('sendBtn');
+    const urlInput = document.getElementById('urlInput');
+    const sendUrlBtn = document.getElementById('sendUrlBtn');
     const roomInput = document.getElementById('roomInput');
     const joinBtn = document.getElementById('joinBtn');
     const progress = document.getElementById('progress');
@@ -847,7 +873,9 @@ function getHTML() {
     async function handleIceCandidate(data) {
       try {
         if (data.candidate && pc) {
+          console.log('📥 Received ICE candidate:', data.candidate.type, data.candidate.candidate);
           await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+          console.log('✅ ICE candidate added successfully');
         }
       } catch (error) {
         console.error('❌ ICE candidate error:', error);
@@ -857,10 +885,13 @@ function getHTML() {
     function setupPeerConnectionHandlers() {
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log('📤 Sending ICE candidate:', event.candidate.type, event.candidate.candidate);
           ws.send(JSON.stringify({
             type: 'ice-candidate',
             candidate: event.candidate
           }));
+        } else {
+          console.log('✅ ICE gathering complete');
         }
       };
       
@@ -877,11 +908,14 @@ function getHTML() {
       };
       
       pc.onicegatheringstatechange = () => {
-        console.log('ICE gathering state:', pc.iceGatheringState);
+        console.log('🧊 ICE gathering state:', pc.iceGatheringState);
       };
       
       pc.oniceconnectionstatechange = () => {
-        console.log('ICE connection state:', pc.iceConnectionState);
+        console.log('🔌 ICE connection state:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          console.log('✅ ICE connection successful!');
+        }
       };
     }
     
@@ -899,14 +933,32 @@ function getHTML() {
           sendBtn.disabled = false;
           sendBtn.textContent = 'Send File (P2P)';
         }
+        
+        if (isSender && urlInput.value.trim()) {
+          sendUrlBtn.disabled = false;
+          sendUrlBtn.textContent = 'Send URL (P2P)';
+        }
       };
       
       dataChannel.onmessage = (event) => {
         if (typeof event.data === 'string') {
-          // Metadata
-          const metadata = JSON.parse(event.data);
-          fileName = metadata.fileName;
-          totalSize = metadata.fileSize;
+          const data = JSON.parse(event.data);
+          
+          // Handle URL message
+          if (data.type === 'url') {
+            statusText.textContent = '🔗 Received URL!';
+            showToast('Redirecting to URL...');
+            
+            // Wait a moment then redirect
+            setTimeout(() => {
+              window.location.href = data.url;
+            }, 1000);
+            return;
+          }
+          
+          // Handle file metadata
+          fileName = data.fileName;
+          totalSize = data.fileSize;
           
           statusText.textContent = 'Receiving file via P2P...';
           fileInfo.style.display = 'block';
@@ -950,6 +1002,12 @@ function getHTML() {
       if (isSender && selectedFile) {
         sendBtn.disabled = false;
         sendBtn.textContent = 'Send via Cloud Storage';
+      }
+      
+      if (isSender && urlInput.value.trim()) {
+        // URL mode doesn't have cloud fallback, just disable
+        sendUrlBtn.disabled = true;
+        sendUrlBtn.textContent = 'P2P Required for URLs';
       }
     }
     
@@ -1084,6 +1142,44 @@ function getHTML() {
       receivedSize = 0;
     }
     
+    async function sendUrl() {
+      const url = urlInput.value.trim();
+      
+      if (!url) {
+        showError('Please enter a URL');
+        return;
+      }
+      
+      // Basic URL validation
+      try {
+        new URL(url);
+      } catch (e) {
+        showError('Please enter a valid URL (e.g., https://example.com)');
+        return;
+      }
+      
+      if (!isP2PConnected || !dataChannel || dataChannel.readyState !== 'open') {
+        showError('P2P connection not established');
+        return;
+      }
+      
+      sendUrlBtn.disabled = true;
+      
+      // Send URL via DataChannel
+      dataChannel.send(JSON.stringify({
+        type: 'url',
+        url: url
+      }));
+      
+      statusText.textContent = '✅ URL sent!';
+      showToast('URL shared successfully!');
+      
+      setTimeout(() => {
+        sendUrlBtn.disabled = false;
+        urlInput.value = '';
+      }, 2000);
+    }
+    
     function formatFileSize(bytes) {
       if (bytes < 1024) return bytes + ' B';
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
@@ -1110,19 +1206,76 @@ function getHTML() {
     // Event Listeners
     sendModeBtn.addEventListener('click', () => {
       sendModeBtn.classList.add('active');
+      urlModeBtn.classList.remove('active');
       receiveModeBtn.classList.remove('active');
       sendSection.classList.add('active');
+      urlSection.classList.remove('active');
+      receiveSection.classList.remove('active');
+    });
+    
+    urlModeBtn.addEventListener('click', () => {
+      urlModeBtn.classList.add('active');
+      sendModeBtn.classList.remove('active');
+      receiveModeBtn.classList.remove('active');
+      urlSection.classList.add('active');
+      sendSection.classList.remove('active');
       receiveSection.classList.remove('active');
     });
     
     receiveModeBtn.addEventListener('click', () => {
       receiveModeBtn.classList.add('active');
       sendModeBtn.classList.remove('active');
+      urlModeBtn.classList.remove('active');
       receiveSection.classList.add('active');
       sendSection.classList.remove('active');
+      urlSection.classList.remove('active');
     });
     
+    // File selection - click
     uploadArea.addEventListener('click', () => fileInput.click());
+    
+    // Drag and drop support
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.style.borderColor = '#667eea';
+      uploadArea.style.background = '#f8f9ff';
+    });
+    
+    uploadArea.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      uploadArea.style.borderColor = '#ddd';
+      uploadArea.style.background = '';
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.style.borderColor = '#ddd';
+      uploadArea.style.background = '';
+      
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        // Simulate file input change
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        fileInput.files = dataTransfer.files;
+        
+        // Trigger change event
+        selectedFile = files[0];
+        fileNameEl.textContent = selectedFile.name;
+        fileSizeEl.textContent = formatFileSize(selectedFile.size);
+        fileInfo.style.display = 'block';
+        
+        if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send File (P2P)';
+        } else {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send via Cloud';
+        }
+        
+        showToast('File selected: ' + selectedFile.name);
+      }
+    });
     
     fileInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
@@ -1142,6 +1295,21 @@ function getHTML() {
     });
     
     sendBtn.addEventListener('click', sendFile);
+    
+    // URL input handling
+    urlInput.addEventListener('input', () => {
+      if (isP2PConnected && dataChannel && dataChannel.readyState === 'open' && urlInput.value.trim()) {
+        sendUrlBtn.disabled = false;
+        sendUrlBtn.textContent = 'Send URL (P2P)';
+      } else if (urlInput.value.trim()) {
+        sendUrlBtn.disabled = false;
+        sendUrlBtn.textContent = 'Enter valid URL';
+      } else {
+        sendUrlBtn.disabled = true;
+      }
+    });
+    
+    sendUrlBtn.addEventListener('click', sendUrl);
     
     joinBtn.addEventListener('click', () => {
       const code = roomInput.value.trim().toUpperCase();
