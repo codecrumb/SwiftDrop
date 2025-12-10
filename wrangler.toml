@@ -20,6 +20,10 @@ tag = "v2"
 deleted_classes = ["SSEConnectionManager"]
 new_sqlite_classes = ["SignalingRoom"]
 
+# Scheduled cleanup for expired files (runs every 5 minutes)
+[triggers]
+crons = ["*/5 * * * *"]
+
 # Observability settings
 [observability]
 [observability.logs]
