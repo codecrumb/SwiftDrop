@@ -816,26 +816,12 @@ function getHTML() {
     // Configuration
     const CONFIG = {
       iceServers: [
-        // Google STUN servers (most reliable, used by VDO.Ninja)
+        // Google STUN servers (original working configuration)
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
-        // Free TURN server from Open Relay Project (for NAT traversal)
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' }
       ],
       p2pTimeout: 10000, // 10 seconds to establish P2P
       chunkSize: 16384, // 16KB chunks
