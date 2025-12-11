@@ -820,8 +820,22 @@ function getHTML() {
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
-        // Cloudflare STUN (backup)
-        { urls: 'stun:stun.cloudflare.com:3478' }
+        // Free TURN server from Open Relay Project (for NAT traversal)
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
       ],
       p2pTimeout: 10000, // 10 seconds to establish P2P
       chunkSize: 16384, // 16KB chunks
@@ -970,17 +984,12 @@ function getHTML() {
     
     async function initiatePeerConnection() {
       try {
-        pc = new RTCPeerConnection({
-          iceServers: CONFIG.iceServers,
-          iceTransportPolicy: 'all', // Use all available candidates (relay, srflx, host)
-          iceCandidatePoolSize: 10 // Pre-gather ICE candidates
-        });
+        pc = new RTCPeerConnection(CONFIG);
         setupPeerConnectionHandlers();
 
-        // Create data channel with reliable configuration
+        // Create data channel
         dataChannel = pc.createDataChannel('file-transfer', {
-          ordered: true,
-          maxRetransmits: null // Ensure reliable delivery
+          ordered: true
         });
         setupDataChannel();
         
@@ -1021,11 +1030,7 @@ function getHTML() {
     
     async function handleOffer(data) {
       try {
-        pc = new RTCPeerConnection({
-          iceServers: CONFIG.iceServers,
-          iceTransportPolicy: 'all',
-          iceCandidatePoolSize: 10
-        });
+        pc = new RTCPeerConnection(CONFIG);
         setupPeerConnectionHandlers();
         
         // Set up data channel handler
