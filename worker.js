@@ -1242,7 +1242,7 @@ function getHTML() {
       try {
         // Check file size limit for R2
         if (selectedFile.size > CONFIG.maxFileSize) {
-          showError(`File too large for cloud fallback (max 20MB). This file can only be sent via P2P.`);
+          showError('File too large for cloud fallback (max 20MB). This file can only be sent via P2P.');
           sendBtn.disabled = false;
           return;
         }
@@ -1397,7 +1397,7 @@ function getHTML() {
             ws.send(JSON.stringify({
               type: 'url-fallback',
               urlId: urlId,
-              redirectUrl: `/url-redirect/${urlId}`
+              redirectUrl: '/url-redirect/' + urlId
             }));
 
             showToast('URL shared via cloud storage!');
