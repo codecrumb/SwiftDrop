@@ -22,7 +22,7 @@ export default {
     // Serve the UI
     if (url.pathname === '/' || url.pathname === '/index.html') {
       return new Response(getHTML(), {
-        headers: {
+        headers: { 
           'Content-Type': 'text/html;charset=UTF-8',
           'Access-Control-Allow-Origin': '*'
         }
@@ -134,7 +134,7 @@ export default {
         });
       }
     }
-    
+
     // R2 Fallback: URL redirect (for URL sharing fallback)
     if (url.pathname.startsWith('/url-redirect/') && request.method === 'GET') {
       const urlId = url.pathname.split('/url-redirect/')[1];
@@ -180,18 +180,18 @@ export default {
     // R2 Fallback: Download file
     if (url.pathname.startsWith('/download/') && request.method === 'GET') {
       const fileId = url.pathname.split('/download/')[1];
-
+      
       if (!fileId) {
         return new Response('File ID required', { status: 400 });
       }
-
+      
       try {
         const object = await env.FILE_STORAGE.get(fileId);
-
+        
         if (!object) {
           return new Response('File not found or expired', { status: 404 });
         }
-
+        
         // Check expiration
         const expiresAt = parseInt(object.customMetadata?.expiresAt || '0');
         if (expiresAt && Date.now() > expiresAt) {
@@ -235,7 +235,7 @@ export default {
         }
       });
     }
-    
+
     return new Response('Not Found', { status: 404 });
   },
 
@@ -414,7 +414,7 @@ export class SignalingRoom {
           from: fromSessionId
         }, fromSessionId);
         break;
-        
+
       case 'ping':
         // Keep-alive
         const session = this.sessions.get(fromSessionId);
@@ -816,7 +816,6 @@ function getHTML() {
     // Configuration
     const CONFIG = {
       iceServers: [
-        // Google STUN servers (original working configuration)
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
@@ -972,7 +971,7 @@ function getHTML() {
       try {
         pc = new RTCPeerConnection(CONFIG);
         setupPeerConnectionHandlers();
-
+        
         // Create data channel
         dataChannel = pc.createDataChannel('file-transfer', {
           ordered: true
@@ -995,15 +994,10 @@ function getHTML() {
             peerInfo.textContent = 'P2P failed, using cloud fallback';
             status.classList.add('fallback');
             showToast('Using cloud storage fallback');
-
+            
             if (selectedFile) {
               sendBtn.disabled = false;
               sendBtn.textContent = 'Send via Cloud';
-            }
-
-            if (urlInput.value.trim()) {
-              sendUrlBtn.disabled = false;
-              sendUrlBtn.textContent = 'Send URL (via Cloud)';
             }
           }
         }, CONFIG.p2pTimeout);
@@ -1177,16 +1171,16 @@ function getHTML() {
       isP2PConnected = false;
       peerInfo.textContent = 'P2P failed, using cloud fallback';
       status.classList.add('fallback');
-
+      
       if (isSender && selectedFile) {
         sendBtn.disabled = false;
         sendBtn.textContent = 'Send via Cloud Storage';
       }
-
+      
       if (isSender && urlInput.value.trim()) {
-        // URL mode now has cloud fallback
-        sendUrlBtn.disabled = false;
-        sendUrlBtn.textContent = 'Send URL (via Cloud)';
+        // URL mode doesn't have cloud fallback, just disable
+        sendUrlBtn.disabled = true;
+        sendUrlBtn.textContent = 'P2P Required for URLs';
       }
     }
     
@@ -1248,7 +1242,7 @@ function getHTML() {
       try {
         // Check file size limit for R2
         if (selectedFile.size > CONFIG.maxFileSize) {
-          showError(\`File too large for cloud fallback (max 20MB). This file can only be sent via P2P.\`);
+          showError(`File too large for cloud fallback (max 20MB). This file can only be sent via P2P.`);
           sendBtn.disabled = false;
           return;
         }
@@ -1256,23 +1250,23 @@ function getHTML() {
         sendBtn.disabled = true;
         progress.style.display = 'block';
         progressText.textContent = 'Uploading to cloud...';
-
+        
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append('roomCode', roomCode);
         formData.append('fileName', selectedFile.name);
-
+        
         const response = await fetch('/upload', {
           method: 'POST',
           body: formData
         });
-
+        
         const result = await response.json();
-
+        
         if (result.success) {
           progressFill.style.width = '100%';
           progressText.textContent = '✅ Uploaded! Sharing link...';
-
+          
           // Send download link to receiver via signaling
           ws.send(JSON.stringify({
             type: 'fallback-link',
@@ -1280,9 +1274,9 @@ function getHTML() {
             downloadUrl: result.downloadUrl,
             fileName: selectedFile.name
           }));
-
+          
           showToast('File uploaded! Link sent to receiver.');
-
+          
           setTimeout(() => {
             progress.style.display = 'none';
             sendBtn.disabled = false;
@@ -1291,7 +1285,7 @@ function getHTML() {
         } else {
           throw new Error(result.error || 'Upload failed');
         }
-
+        
       } catch (error) {
         console.error('❌ Fallback upload error:', error);
         showError('Upload failed. Please try again.');
@@ -1321,7 +1315,7 @@ function getHTML() {
         window.location.href = data.redirectUrl;
       }, 1000);
     }
-    
+
     function downloadReceivedFile() {
       const blob = new Blob(receivedChunks);
       const url = URL.createObjectURL(blob);
@@ -1403,7 +1397,7 @@ function getHTML() {
             ws.send(JSON.stringify({
               type: 'url-fallback',
               urlId: urlId,
-              redirectUrl: \`/url-redirect/\${urlId}\`
+              redirectUrl: `/url-redirect/${urlId}`
             }));
 
             showToast('URL shared via cloud storage!');
@@ -1496,41 +1490,29 @@ function getHTML() {
       e.preventDefault();
       uploadArea.style.borderColor = '#ddd';
       uploadArea.style.background = '';
-
+      
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         // Simulate file input change
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(files[0]);
         fileInput.files = dataTransfer.files;
-
+        
         // Trigger change event
         selectedFile = files[0];
         fileNameEl.textContent = selectedFile.name;
         fileSizeEl.textContent = formatFileSize(selectedFile.size);
         fileInfo.style.display = 'block';
-
-        // Check file size and connection status
-        if (selectedFile.size > CONFIG.maxFileSize) {
-          if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send File (P2P Only - Large File)';
-            showToast('⚠️ File > 20MB - P2P only, no cloud fallback');
-          } else {
-            sendBtn.disabled = true;
-            sendBtn.textContent = 'File Too Large (P2P Required)';
-            showError('File exceeds 20MB limit. P2P connection required.');
-          }
+        
+        if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send File (P2P)';
         } else {
-          if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send File (P2P)';
-          } else {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send via Cloud';
-          }
-          showToast('File selected: ' + selectedFile.name);
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send via Cloud';
         }
+        
+        showToast('File selected: ' + selectedFile.name);
       }
     });
     
@@ -1540,26 +1522,13 @@ function getHTML() {
         fileNameEl.textContent = selectedFile.name;
         fileSizeEl.textContent = formatFileSize(selectedFile.size);
         fileInfo.style.display = 'block';
-
-        // Check file size and connection status
-        if (selectedFile.size > CONFIG.maxFileSize) {
-          if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send File (P2P Only - Large File)';
-            showToast('⚠️ File > 20MB - P2P only, no cloud fallback');
-          } else {
-            sendBtn.disabled = true;
-            sendBtn.textContent = 'File Too Large (P2P Required)';
-            showError('File exceeds 20MB limit. P2P connection required.');
-          }
+        
+        if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send File (P2P)';
         } else {
-          if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send File (P2P)';
-          } else {
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send via Cloud';
-          }
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send via Cloud';
         }
       }
     });
@@ -1568,14 +1537,12 @@ function getHTML() {
     
     // URL input handling
     urlInput.addEventListener('input', () => {
-      if (urlInput.value.trim()) {
-        if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
-          sendUrlBtn.disabled = false;
-          sendUrlBtn.textContent = 'Send URL (P2P)';
-        } else {
-          sendUrlBtn.disabled = false;
-          sendUrlBtn.textContent = 'Send URL (via Cloud)';
-        }
+      if (isP2PConnected && dataChannel && dataChannel.readyState === 'open' && urlInput.value.trim()) {
+        sendUrlBtn.disabled = false;
+        sendUrlBtn.textContent = 'Send URL (P2P)';
+      } else if (urlInput.value.trim()) {
+        sendUrlBtn.disabled = false;
+        sendUrlBtn.textContent = 'Enter valid URL';
       } else {
         sendUrlBtn.disabled = true;
       }
