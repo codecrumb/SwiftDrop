@@ -6,7 +6,19 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    
+
+    // Manual cleanup trigger (for testing)
+    if (url.pathname === '/cleanup' && request.method === 'POST') {
+      const deleted = await cleanupExpiredFiles(env);
+      return new Response(JSON.stringify({
+        success: true,
+        deletedCount: deleted,
+        message: `Cleaned up ${deleted} expired files`
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // Serve the UI
     if (url.pathname === '/' || url.pathname === '/index.html') {
       return new Response(getHTML(), {
@@ -32,25 +44,65 @@ export default {
       return room.fetch(request);
     }
     
-    // R2 Fallback: Upload file
+    // R2 Fallback: Upload file or URL
     if (url.pathname === '/upload' && request.method === 'POST') {
       try {
+        const contentType = request.headers.get('content-type') || '';
+
+        // Handle URL upload (JSON)
+        if (contentType.includes('application/json')) {
+          const data = await request.json();
+          const { urlId, url: targetUrl, roomCode, timestamp } = data;
+
+          if (!urlId || !targetUrl || !roomCode) {
+            return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Store URL in R2
+          await env.FILE_STORAGE.put(urlId, targetUrl, {
+            httpMetadata: {
+              contentType: 'text/plain',
+            },
+            customMetadata: {
+              roomCode,
+              type: 'url',
+              uploadedAt: timestamp.toString(),
+              expiresAt: (timestamp + 20 * 60 * 1000).toString() // 20 minutes
+            }
+          });
+
+          return new Response(JSON.stringify({
+            success: true,
+            urlId,
+            redirectUrl: `/url-redirect/${urlId}`
+          }), {
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+
+        // Handle file upload (FormData)
         const formData = await request.formData();
         const file = formData.get('file');
         const roomCode = formData.get('roomCode');
         const fileName = formData.get('fileName');
-        
+
         if (!file || !roomCode) {
           return new Response(JSON.stringify({ error: 'Missing file or room code' }), {
             status: 400,
             headers: { 'Content-Type': 'application/json' }
           });
         }
-        
+
         // Generate unique file ID
         const fileId = crypto.randomUUID();
         const timestamp = Date.now();
-        
+
         // Store file in R2
         await env.FILE_STORAGE.put(fileId, file, {
           httpMetadata: {
@@ -63,13 +115,13 @@ export default {
             expiresAt: (timestamp + 20 * 60 * 1000).toString() // 20 minutes
           }
         });
-        
+
         return new Response(JSON.stringify({
           success: true,
           fileId,
           downloadUrl: `/download/${fileId}`
         }), {
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
           }
@@ -82,7 +134,49 @@ export default {
         });
       }
     }
-    
+
+    // R2 Fallback: URL redirect (for URL sharing fallback)
+    if (url.pathname.startsWith('/url-redirect/') && request.method === 'GET') {
+      const urlId = url.pathname.split('/url-redirect/')[1];
+
+      if (!urlId) {
+        return new Response('URL ID required', { status: 400 });
+      }
+
+      try {
+        const object = await env.FILE_STORAGE.get(urlId);
+
+        if (!object) {
+          return new Response('URL not found or expired', { status: 404 });
+        }
+
+        // Check expiration
+        const expiresAt = parseInt(object.customMetadata?.expiresAt || '0');
+        if (expiresAt && Date.now() > expiresAt) {
+          await env.FILE_STORAGE.delete(urlId);
+          console.log(`[R2] Deleted expired URL: ${urlId}`);
+          return new Response('URL expired', { status: 410 });
+        }
+
+        // Read the URL from the object
+        const redirectUrl = await object.text();
+
+        // Delete the URL object after use
+        try {
+          await env.FILE_STORAGE.delete(urlId);
+          console.log(`[R2] Deleted URL after redirect: ${urlId}`);
+        } catch (deleteError) {
+          console.error(`[R2] Failed to delete URL ${urlId}:`, deleteError);
+        }
+
+        // Redirect to the URL
+        return Response.redirect(redirectUrl, 302);
+      } catch (error) {
+        console.error('URL redirect error:', error);
+        return new Response('Redirect failed', { status: 500 });
+      }
+    }
+
     // R2 Fallback: Download file
     if (url.pathname.startsWith('/download/') && request.method === 'GET') {
       const fileId = url.pathname.split('/download/')[1];
@@ -102,22 +196,29 @@ export default {
         const expiresAt = parseInt(object.customMetadata?.expiresAt || '0');
         if (expiresAt && Date.now() > expiresAt) {
           await env.FILE_STORAGE.delete(fileId);
+          console.log(`[R2] Deleted expired file: ${fileId}`);
           return new Response('File expired', { status: 410 });
         }
-        
+
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set('Content-Disposition', `attachment; filename="${object.customMetadata?.fileName || 'download'}"`);
         headers.set('Access-Control-Allow-Origin', '*');
-        
-        // Store body as we can only read it once
-        const body = object.body;
-        
-        // Delete file immediately after serving (cleanup)
-        // Fire and forget - don't await to avoid blocking response
-        env.FILE_STORAGE.delete(fileId).catch(err => console.error('Cleanup error:', err));
-        
-        return new Response(body, { headers });
+
+        // Read the entire file into array buffer (files are < 20MB so this is safe)
+        const arrayBuffer = await object.arrayBuffer();
+
+        // Now delete the file from R2 (properly awaited)
+        try {
+          await env.FILE_STORAGE.delete(fileId);
+          console.log(`[R2] Deleted file after download: ${fileId}`);
+        } catch (deleteError) {
+          console.error(`[R2] Failed to delete file ${fileId}:`, deleteError);
+          // Continue serving the file even if deletion fails
+        }
+
+        // Return the file content
+        return new Response(arrayBuffer, { headers });
       } catch (error) {
         console.error('Download error:', error);
         return new Response('Download failed', { status: 500 });
@@ -134,10 +235,66 @@ export default {
         }
       });
     }
-    
+
     return new Response('Not Found', { status: 404 });
+  },
+
+  // Scheduled cleanup (runs every 5 minutes via cron trigger)
+  async scheduled(event, env, ctx) {
+    console.log('[Cleanup] Starting scheduled cleanup...');
+    const deleted = await cleanupExpiredFiles(env);
+    console.log(`[Cleanup] Finished. Deleted ${deleted} expired files.`);
   }
 };
+
+/**
+ * Cleanup expired files from R2 storage
+ */
+async function cleanupExpiredFiles(env) {
+  try {
+    const now = Date.now();
+    let deletedCount = 0;
+    let cursor;
+    let truncated = true;
+
+    // List all objects in R2 bucket
+    do {
+      const listed = await env.FILE_STORAGE.list({
+        cursor: cursor,
+        limit: 1000
+      });
+
+      // Check each object for expiration
+      for (const object of listed.objects) {
+        try {
+          // Get the full object to read metadata
+          const fullObject = await env.FILE_STORAGE.get(object.key);
+
+          if (!fullObject) continue;
+
+          const expiresAt = parseInt(fullObject.customMetadata?.expiresAt || '0');
+
+          if (expiresAt && now > expiresAt) {
+            // File has expired, delete it
+            await env.FILE_STORAGE.delete(object.key);
+            deletedCount++;
+            console.log(`[Cleanup] Deleted expired file: ${object.key} (expired at ${new Date(expiresAt).toISOString()})`);
+          }
+        } catch (err) {
+          console.error(`[Cleanup] Error processing object ${object.key}:`, err);
+        }
+      }
+
+      cursor = listed.cursor;
+      truncated = listed.truncated;
+    } while (truncated);
+
+    return deletedCount;
+  } catch (error) {
+    console.error('[Cleanup] Error during cleanup:', error);
+    return 0;
+  }
+}
 
 /**
  * Durable Object: SignalingRoom
@@ -247,7 +404,17 @@ export class SignalingRoom {
           from: fromSessionId
         }, fromSessionId);
         break;
-        
+
+      case 'url-fallback':
+        // Relay URL redirect link to other peer
+        this.broadcast({
+          type: 'url-fallback',
+          urlId: data.urlId,
+          redirectUrl: data.redirectUrl,
+          from: fromSessionId
+        }, fromSessionId);
+        break;
+
       case 'ping':
         // Keep-alive
         const session = this.sessions.get(fromSessionId);
@@ -656,7 +823,8 @@ function getHTML() {
         { urls: 'stun:stun4.l.google.com:19302' }
       ],
       p2pTimeout: 10000, // 10 seconds to establish P2P
-      chunkSize: 16384 // 16KB chunks
+      chunkSize: 16384, // 16KB chunks
+      maxFileSize: 20 * 1024 * 1024 // 20MB limit for R2 fallback
     };
     
     // State
@@ -783,7 +951,12 @@ function getHTML() {
           // Receiver got fallback download link
           handleFallbackLink(data);
           break;
-          
+
+        case 'url-fallback':
+          // Receiver got URL redirect link (fallback)
+          handleUrlFallback(data);
+          break;
+
         case 'peer-left':
           peerInfo.textContent = 'Peer disconnected';
           status.classList.remove('connected');
@@ -1067,6 +1240,13 @@ function getHTML() {
     
     async function sendFileFallback() {
       try {
+        // Check file size limit for R2
+        if (selectedFile.size > CONFIG.maxFileSize) {
+          showError('File too large for cloud fallback (max 20MB). This file can only be sent via P2P.');
+          sendBtn.disabled = false;
+          return;
+        }
+
         sendBtn.disabled = true;
         progress.style.display = 'block';
         progressText.textContent = 'Uploading to cloud...';
@@ -1120,11 +1300,22 @@ function getHTML() {
       downloadFileName.textContent = data.fileName;
       downloadBtn.href = data.downloadUrl;
       downloadBtn.download = data.fileName;
-      
+
       statusText.textContent = 'File ready for download!';
       showToast('File received via cloud storage!');
     }
-    
+
+    function handleUrlFallback(data) {
+      // Receiver gets URL redirect link (fallback)
+      statusText.textContent = '🔗 Received URL (via cloud)!';
+      showToast('Redirecting to URL...');
+
+      // Wait a moment then redirect
+      setTimeout(() => {
+        window.location.href = data.redirectUrl;
+      }, 1000);
+    }
+
     function downloadReceivedFile() {
       const blob = new Blob(receivedChunks);
       const url = URL.createObjectURL(blob);
@@ -1144,12 +1335,12 @@ function getHTML() {
     
     async function sendUrl() {
       const url = urlInput.value.trim();
-      
+
       if (!url) {
         showError('Please enter a URL');
         return;
       }
-      
+
       // Basic URL validation
       try {
         new URL(url);
@@ -1157,27 +1348,75 @@ function getHTML() {
         showError('Please enter a valid URL (e.g., https://example.com)');
         return;
       }
-      
-      if (!isP2PConnected || !dataChannel || dataChannel.readyState !== 'open') {
-        showError('P2P connection not established');
-        return;
-      }
-      
+
       sendUrlBtn.disabled = true;
-      
-      // Send URL via DataChannel
-      dataChannel.send(JSON.stringify({
-        type: 'url',
-        url: url
-      }));
-      
-      statusText.textContent = '✅ URL sent!';
-      showToast('URL shared successfully!');
-      
-      setTimeout(() => {
-        sendUrlBtn.disabled = false;
-        urlInput.value = '';
-      }, 2000);
+
+      // Try P2P first if available
+      if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+        // Send URL via DataChannel
+        dataChannel.send(JSON.stringify({
+          type: 'url',
+          url: url
+        }));
+
+        statusText.textContent = '✅ URL sent via P2P!';
+        showToast('URL shared successfully!');
+
+        setTimeout(() => {
+          sendUrlBtn.disabled = false;
+          urlInput.value = '';
+        }, 2000);
+      } else {
+        // Use R2 fallback
+        try {
+          progress.style.display = 'block';
+          progressText.textContent = 'Uploading URL...';
+
+          const urlId = crypto.randomUUID();
+          const timestamp = Date.now();
+
+          // Upload URL as text to R2
+          const response = await fetch('/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              urlId: urlId,
+              url: url,
+              roomCode: roomCode,
+              timestamp: timestamp
+            })
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            progressFill.style.width = '100%';
+            progressText.textContent = '✅ URL uploaded!';
+
+            // Send URL redirect link to receiver via signaling
+            ws.send(JSON.stringify({
+              type: 'url-fallback',
+              urlId: urlId,
+              redirectUrl: '/url-redirect/' + urlId
+            }));
+
+            showToast('URL shared via cloud storage!');
+
+            setTimeout(() => {
+              progress.style.display = 'none';
+              sendUrlBtn.disabled = false;
+              urlInput.value = '';
+            }, 2000);
+          } else {
+            throw new Error(result.error || 'URL upload failed');
+          }
+        } catch (error) {
+          console.error('❌ URL fallback error:', error);
+          showError('Failed to share URL. Please try again.');
+          sendUrlBtn.disabled = false;
+          progress.style.display = 'none';
+        }
+      }
     }
     
     function formatFileSize(bytes) {
