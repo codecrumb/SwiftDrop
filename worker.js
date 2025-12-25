@@ -510,15 +510,51 @@ function getHTML() {
       margin-bottom: 20px;
       text-align: center;
     }
-    
+
     .status.connected {
       background: #f0fdf4;
       border-color: #86efac;
     }
-    
-    .status.fallback {
+
+    .status.relay {
+      background: #dbeafe;
+      border-color: #3b82f6;
+    }
+
+    .status.connecting {
       background: #fef3c7;
       border-color: #fbbf24;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+
+    .status-badge.badge-waiting {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+
+    .status-badge.badge-connecting {
+      background: #fef3c7;
+      color: #f59e0b;
+    }
+
+    .status-badge.badge-p2p {
+      background: #d1fae5;
+      color: #059669;
+    }
+
+    .status-badge.badge-relay {
+      background: #dbeafe;
+      color: #3b82f6;
     }
     
     .room-code {
@@ -750,7 +786,10 @@ function getHTML() {
     <div class="status" id="status">
       <div id="statusText">Generating room code...</div>
       <div class="room-code" id="roomCode">------</div>
-      <div class="peer-info" id="peerInfo">Waiting for connection...</div>
+      <div class="status-badge badge-waiting" id="statusBadge">
+        <span class="status-icon">⏳</span>
+        <span class="status-text">Waiting for peer...</span>
+      </div>
     </div>
     
     <div class="mode-selector">
@@ -846,7 +885,7 @@ function getHTML() {
     const status = document.getElementById('status');
     const statusText = document.getElementById('statusText');
     const roomCodeEl = document.getElementById('roomCode');
-    const peerInfo = document.getElementById('peerInfo');
+    const statusBadge = document.getElementById('statusBadge');
     const sendModeBtn = document.getElementById('sendModeBtn');
     const urlModeBtn = document.getElementById('urlModeBtn');
     const receiveModeBtn = document.getElementById('receiveModeBtn');
@@ -874,7 +913,45 @@ function getHTML() {
     
     // Initialize
     init();
-    
+
+    // Helper function to update status badge
+    function updateStatusBadge(state, message) {
+      const badge = statusBadge;
+      const icon = badge.querySelector('.status-icon');
+      const text = badge.querySelector('.status-text');
+
+      // Remove all badge classes
+      badge.className = 'status-badge';
+      status.className = 'status';
+
+      switch(state) {
+        case 'waiting':
+          badge.classList.add('badge-waiting');
+          icon.textContent = '⏳';
+          text.textContent = message || 'Waiting for peer...';
+          break;
+        case 'connecting':
+          badge.classList.add('badge-connecting');
+          status.classList.add('connecting');
+          icon.textContent = '🔄';
+          text.textContent = message || 'Connecting...';
+          break;
+        case 'p2p':
+          badge.classList.add('badge-p2p');
+          status.classList.add('connected');
+          roomCodeEl.classList.add('connected');
+          icon.textContent = '✅';
+          text.textContent = message || 'P2P Connected';
+          break;
+        case 'relay':
+          badge.classList.add('badge-relay');
+          status.classList.add('relay');
+          icon.textContent = '☁️';
+          text.textContent = message || 'Cloud Relay Active';
+          break;
+      }
+    }
+
     function init() {
       roomCode = generateRoomCode();
       roomCodeEl.textContent = roomCode;
@@ -924,11 +1001,10 @@ function getHTML() {
           break;
           
         case 'peer-joined':
-          peerInfo.textContent = 'Peer connected! Establishing P2P...';
-          status.classList.add('connected');
-          roomCodeEl.classList.add('connected');
+          updateStatusBadge('connecting', 'Connecting...');
+          statusText.textContent = 'Peer connected! Establishing connection...';
           showToast('Peer joined! Connecting...');
-          
+
           if (isSender) {
             // Start P2P connection with timeout
             await initiatePeerConnection();
@@ -958,8 +1034,8 @@ function getHTML() {
           break;
 
         case 'peer-left':
-          peerInfo.textContent = 'Peer disconnected';
-          status.classList.remove('connected');
+          updateStatusBadge('waiting', 'Waiting for peer...');
+          statusText.textContent = 'Peer disconnected';
           roomCodeEl.classList.remove('connected');
           sendBtn.disabled = true;
           showToast('Peer disconnected');
@@ -990,11 +1066,11 @@ function getHTML() {
         // Set timeout for P2P connection
         p2pTimeout = setTimeout(() => {
           if (!isP2PConnected) {
-            console.log('⏱️ P2P timeout, will use fallback');
-            peerInfo.textContent = 'P2P failed, using cloud fallback';
-            status.classList.add('fallback');
-            showToast('Using cloud storage fallback');
-            
+            console.log('☁️ Using Cloud Relay for this transfer');
+            updateStatusBadge('relay', 'Cloud Relay Active');
+            statusText.textContent = 'Using Cloud Relay for this transfer';
+            showToast('Using Cloud Relay');
+
             if (selectedFile) {
               sendBtn.disabled = false;
               sendBtn.textContent = 'Send via Cloud';
@@ -1098,15 +1174,16 @@ function getHTML() {
       dataChannel.onopen = () => {
         console.log('✅ Data channel open');
         isP2PConnected = true;
-        peerInfo.textContent = '✅ Ready for P2P transfer!';
-        
+        updateStatusBadge('p2p', 'P2P Connected');
+        statusText.textContent = 'Ready for P2P transfer!';
+
         if (p2pTimeout) clearTimeout(p2pTimeout);
-        
+
         if (isSender && selectedFile) {
           sendBtn.disabled = false;
           sendBtn.textContent = 'Send File (P2P)';
         }
-        
+
         if (isSender && urlInput.value.trim()) {
           sendUrlBtn.disabled = false;
           sendUrlBtn.textContent = 'Send URL (P2P)';
@@ -1167,20 +1244,19 @@ function getHTML() {
     }
     
     function handleP2PFailure() {
-      console.log('❌ P2P connection failed, using fallback');
+      console.log('☁️ Switching to Cloud Relay');
       isP2PConnected = false;
-      peerInfo.textContent = 'P2P failed, using cloud fallback';
-      status.classList.add('fallback');
-      
+      updateStatusBadge('relay', 'Cloud Relay Active');
+      statusText.textContent = 'Connected via Cloud Relay';
+
       if (isSender && selectedFile) {
         sendBtn.disabled = false;
-        sendBtn.textContent = 'Send via Cloud Storage';
+        sendBtn.textContent = 'Send via Cloud';
       }
-      
+
       if (isSender && urlInput.value.trim()) {
-        // URL mode doesn't have cloud fallback, just disable
-        sendUrlBtn.disabled = true;
-        sendUrlBtn.textContent = 'P2P Required for URLs';
+        sendUrlBtn.disabled = false;
+        sendUrlBtn.textContent = 'Send URL (via Cloud)';
       }
     }
     
@@ -1242,7 +1318,7 @@ function getHTML() {
       try {
         // Check file size limit for R2
         if (selectedFile.size > CONFIG.maxFileSize) {
-          showError('File too large for cloud fallback (max 20MB). This file can only be sent via P2P.');
+          showError('File too large for Cloud Relay (max 20MB). This file can only be sent via P2P.');
           sendBtn.disabled = false;
           return;
         }
@@ -1302,7 +1378,7 @@ function getHTML() {
       downloadBtn.download = data.fileName;
 
       statusText.textContent = 'File ready for download!';
-      showToast('File received via cloud storage!');
+      showToast('File received via Cloud Relay!');
     }
 
     function handleUrlFallback(data) {
@@ -1400,7 +1476,7 @@ function getHTML() {
               redirectUrl: '/url-redirect/' + urlId
             }));
 
-            showToast('URL shared via cloud storage!');
+            showToast('URL shared via Cloud Relay!');
 
             setTimeout(() => {
               progress.style.display = 'none';
