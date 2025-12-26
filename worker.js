@@ -1409,12 +1409,12 @@ function getHTML(env) {
       let url = inputUrl.trim();
 
       // Auto-prepend https:// if no protocol
-      if (url && !url.match(/^https?:\/\//i)) {
+      if (url && !url.match(/^https?:\\/\\//i)) {
         url = 'https://' + url;
       }
 
       // Validate URL format with TLD check (2-6 letters, handles .co.uk etc)
-      const urlPattern = /^https?:\/\/([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.[a-zA-Z]{2,6}(\/.*)?$/;
+      const urlPattern = /^https?:\\/\\/([a-zA-Z0-9-]+\\.)*[a-zA-Z0-9-]+\\.[a-zA-Z]{2,6}(\\/.*)?$/;
 
       if (!url || !urlPattern.test(url)) {
         return { valid: false, url: null };
