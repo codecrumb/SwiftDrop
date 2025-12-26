@@ -659,16 +659,35 @@ function getHTML() {
       font-weight: 600;
       cursor: pointer;
       width: 100%;
-      transition: transform 0.2s;
+      transition: all 0.2s;
     }
-    
+
     .btn:hover:not(:disabled) {
       transform: translateY(-2px);
     }
-    
+
     .btn:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+    }
+
+    /* Button state variations */
+    .btn-gray {
+      background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+      opacity: 0.7;
+    }
+
+    .btn-gray:hover {
+      opacity: 0.85;
+      transform: translateY(-1px);
+    }
+
+    .btn-active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .btn-blue {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     }
     
     .progress {
@@ -952,6 +971,39 @@ function getHTML() {
       }
     }
 
+    // Helper function to update send button state
+    function updateSendButton(state) {
+      if (!selectedFile) return;
+
+      // Remove all button state classes
+      sendBtn.className = 'btn';
+
+      switch(state) {
+        case 'waiting':
+          sendBtn.disabled = true;
+          sendBtn.textContent = 'Waiting for receiver...';
+          break;
+        case 'connecting':
+          // Gray but clickable - allows skipping P2P attempt
+          sendBtn.classList.add('btn-gray');
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Upload via Cloud';
+          break;
+        case 'p2p':
+          // Active purple - P2P is ready
+          sendBtn.classList.add('btn-active');
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send File (P2P)';
+          break;
+        case 'relay':
+          // Blue highlighted - Cloud Relay active
+          sendBtn.classList.add('btn-blue');
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Upload via Cloud';
+          break;
+      }
+    }
+
     function init() {
       roomCode = generateRoomCode();
       roomCodeEl.textContent = roomCode;
@@ -1006,6 +1058,8 @@ function getHTML() {
           showToast('Peer joined! Connecting...');
 
           if (isSender) {
+            // Update button to gray/clickable state (allows skipping P2P)
+            updateSendButton('connecting');
             // Start P2P connection with timeout
             await initiatePeerConnection();
           }
@@ -1070,11 +1124,7 @@ function getHTML() {
             updateStatusBadge('relay', 'Cloud Relay Active');
             statusText.textContent = 'Using Cloud Relay for this transfer';
             showToast('Using Cloud Relay');
-
-            if (selectedFile) {
-              sendBtn.disabled = false;
-              sendBtn.textContent = 'Send via Cloud';
-            }
+            updateSendButton('relay');
           }
         }, CONFIG.p2pTimeout);
         
@@ -1179,14 +1229,13 @@ function getHTML() {
 
         if (p2pTimeout) clearTimeout(p2pTimeout);
 
-        if (isSender && selectedFile) {
-          sendBtn.disabled = false;
-          sendBtn.textContent = 'Send File (P2P)';
-        }
+        if (isSender) {
+          updateSendButton('p2p');
 
-        if (isSender && urlInput.value.trim()) {
-          sendUrlBtn.disabled = false;
-          sendUrlBtn.textContent = 'Send URL (P2P)';
+          if (urlInput.value.trim()) {
+            sendUrlBtn.disabled = false;
+            sendUrlBtn.textContent = 'Send URL (P2P)';
+          }
         }
       };
       
@@ -1249,14 +1298,13 @@ function getHTML() {
       updateStatusBadge('relay', 'Cloud Relay Active');
       statusText.textContent = 'Connected via Cloud Relay';
 
-      if (isSender && selectedFile) {
-        sendBtn.disabled = false;
-        sendBtn.textContent = 'Send via Cloud';
-      }
+      if (isSender) {
+        updateSendButton('relay');
 
-      if (isSender && urlInput.value.trim()) {
-        sendUrlBtn.disabled = false;
-        sendUrlBtn.textContent = 'Send URL (via Cloud)';
+        if (urlInput.value.trim()) {
+          sendUrlBtn.disabled = false;
+          sendUrlBtn.textContent = 'Send URL (via Cloud)';
+        }
       }
     }
     
@@ -1579,15 +1627,17 @@ function getHTML() {
         fileNameEl.textContent = selectedFile.name;
         fileSizeEl.textContent = formatFileSize(selectedFile.size);
         fileInfo.style.display = 'block';
-        
+
+        // Update button based on current connection state
         if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
-          sendBtn.disabled = false;
-          sendBtn.textContent = 'Send File (P2P)';
+          updateSendButton('p2p');
+        } else if (ws && ws.readyState === WebSocket.OPEN) {
+          // Connected via websocket but P2P not ready
+          updateSendButton('connecting');
         } else {
-          sendBtn.disabled = false;
-          sendBtn.textContent = 'Send via Cloud';
+          updateSendButton('waiting');
         }
-        
+
         showToast('File selected: ' + selectedFile.name);
       }
     });
@@ -1598,13 +1648,15 @@ function getHTML() {
         fileNameEl.textContent = selectedFile.name;
         fileSizeEl.textContent = formatFileSize(selectedFile.size);
         fileInfo.style.display = 'block';
-        
+
+        // Update button based on current connection state
         if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
-          sendBtn.disabled = false;
-          sendBtn.textContent = 'Send File (P2P)';
+          updateSendButton('p2p');
+        } else if (ws && ws.readyState === WebSocket.OPEN) {
+          // Connected via websocket but P2P not ready
+          updateSendButton('connecting');
         } else {
-          sendBtn.disabled = false;
-          sendBtn.textContent = 'Send via Cloud';
+          updateSendButton('waiting');
         }
       }
     });
