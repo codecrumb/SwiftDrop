@@ -21,8 +21,8 @@ export default {
 
     // Serve the UI
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      return new Response(getHTML(), {
-        headers: { 
+      return new Response(getHTML(env), {
+        headers: {
           'Content-Type': 'text/html;charset=UTF-8',
           'Access-Control-Allow-Origin': '*'
         }
@@ -52,11 +52,20 @@ export default {
         // Handle URL upload (JSON)
         if (contentType.includes('application/json')) {
           const data = await request.json();
-          const { urlId, url: targetUrl, roomCode, timestamp } = data;
+          const { urlId, url: targetUrl, roomCode, timestamp, turnstileToken } = data;
 
           if (!urlId || !targetUrl || !roomCode) {
             return new Response(JSON.stringify({ error: 'Missing required fields' }), {
               status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Verify Turnstile token
+          const isValid = await verifyTurnstile(turnstileToken, env);
+          if (!isValid) {
+            return new Response(JSON.stringify({ error: 'Bot verification failed' }), {
+              status: 403,
               headers: { 'Content-Type': 'application/json' }
             });
           }
@@ -91,10 +100,20 @@ export default {
         const file = formData.get('file');
         const roomCode = formData.get('roomCode');
         const fileName = formData.get('fileName');
+        const turnstileToken = formData.get('turnstileToken');
 
         if (!file || !roomCode) {
           return new Response(JSON.stringify({ error: 'Missing file or room code' }), {
             status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Verify Turnstile token
+        const isValid = await verifyTurnstile(turnstileToken, env);
+        if (!isValid) {
+          return new Response(JSON.stringify({ error: 'Bot verification failed' }), {
+            status: 403,
             headers: { 'Content-Type': 'application/json' }
           });
         }
@@ -246,6 +265,39 @@ export default {
     console.log(`[Cleanup] Finished. Deleted ${deleted} expired files.`);
   }
 };
+
+/**
+ * Verify Turnstile token for bot protection
+ */
+async function verifyTurnstile(token, env) {
+  if (!token) {
+    console.log('[Turnstile] No token provided');
+    return false;
+  }
+
+  if (!env.TURNSTILE_SECRET) {
+    console.warn('[Turnstile] TURNSTILE_SECRET not configured, skipping verification');
+    return true; // Allow requests when Turnstile is not configured
+  }
+
+  try {
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        secret: env.TURNSTILE_SECRET,
+        response: token
+      })
+    });
+
+    const result = await response.json();
+    console.log('[Turnstile] Verification result:', result.success);
+    return result.success;
+  } catch (error) {
+    console.error('[Turnstile] Verification error:', error);
+    return false;
+  }
+}
 
 /**
  * Cleanup expired files from R2 storage
@@ -457,7 +509,8 @@ export class SignalingRoom {
  * HTML UI for SwiftDrop
  * Preserves existing design, adds WebRTC + R2 fallback logic
  */
-function getHTML() {
+function getHTML(env) {
+  const turnstileSiteKey = env.TURNSTILE_SITE_ID || '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -465,6 +518,7 @@ function getHTML() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SwiftDrop - P2P File Transfer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
     * {
       margin: 0;
@@ -1006,6 +1060,16 @@ function getHTML() {
 
   <div class="toast" id="toast"></div>
 
+  <!-- Turnstile Widget (invisible, for cloud uploads only) -->
+  <div class="cf-turnstile"
+       id="turnstileWidget"
+       data-sitekey="${turnstileSiteKey}"
+       data-theme="light"
+       data-size="invisible"
+       data-callback="onTurnstileSuccess"
+       style="display:none;">
+  </div>
+
   <!-- QR Code Modal -->
   <div class="qr-modal" id="qrModal">
     <div class="qr-modal-content">
@@ -1048,6 +1112,7 @@ function getHTML() {
     let fileName = '';
     let p2pTimeout = null;
     let isP2PConnected = false;
+    let turnstileToken = null;
     
     // Elements
     const status = document.getElementById('status');
@@ -1189,6 +1254,38 @@ function getHTML() {
       qrModal.classList.remove('show');
       document.body.style.overflow = ''; // Restore scroll
     }
+
+    // Turnstile helper functions
+    async function getTurnstileToken() {
+      return new Promise((resolve, reject) => {
+        if (!window.turnstile) {
+          console.error('Turnstile not loaded');
+          reject(new Error('Turnstile not available'));
+          return;
+        }
+
+        try {
+          // Execute Turnstile (invisible mode)
+          window.turnstile.execute('#turnstileWidget', {
+            callback: (token) => {
+              turnstileToken = token;
+              resolve(token);
+            },
+            'error-callback': () => {
+              reject(new Error('Turnstile verification failed'));
+            }
+          });
+        } catch (error) {
+          console.error('Turnstile execution error:', error);
+          reject(error);
+        }
+      });
+    }
+
+    // Turnstile success callback (called by Turnstile widget)
+    window.onTurnstileSuccess = function(token) {
+      turnstileToken = token;
+    };
 
     function init() {
       // Check for auto-join via URL parameter
@@ -1582,24 +1679,47 @@ function getHTML() {
 
         sendBtn.disabled = true;
         progress.style.display = 'block';
+        progressText.textContent = 'Verifying...';
+
+        // Get Turnstile token for bot protection
+        let token;
+        try {
+          token = await getTurnstileToken();
+        } catch (error) {
+          console.error('Turnstile verification failed:', error);
+          showError('Verification failed. Please try again.');
+          sendBtn.disabled = false;
+          progress.style.display = 'none';
+          return;
+        }
+
         progressText.textContent = 'Uploading to cloud...';
-        
+
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append('roomCode', roomCode);
         formData.append('fileName', selectedFile.name);
-        
+        formData.append('turnstileToken', token);
+
         const response = await fetch('/upload', {
           method: 'POST',
           body: formData
         });
         
+        if (!response.ok) {
+          const result = await response.json();
+          if (response.status === 403) {
+            throw new Error('Bot verification failed. Please refresh and try again.');
+          }
+          throw new Error(result.error || 'Upload failed');
+        }
+
         const result = await response.json();
-        
+
         if (result.success) {
           progressFill.style.width = '100%';
           progressText.textContent = '✅ Uploaded! Sharing link...';
-          
+
           // Send download link to receiver via signaling
           ws.send(JSON.stringify({
             type: 'fallback-link',
@@ -1607,9 +1727,9 @@ function getHTML() {
             downloadUrl: result.downloadUrl,
             fileName: selectedFile.name
           }));
-          
+
           showToast('File uploaded! Link sent to receiver.');
-          
+
           setTimeout(() => {
             progress.style.display = 'none';
             sendBtn.disabled = false;
@@ -1703,6 +1823,20 @@ function getHTML() {
         // Use R2 fallback
         try {
           progress.style.display = 'block';
+          progressText.textContent = 'Verifying...';
+
+          // Get Turnstile token for bot protection
+          let token;
+          try {
+            token = await getTurnstileToken();
+          } catch (error) {
+            console.error('Turnstile verification failed:', error);
+            showError('Verification failed. Please try again.');
+            sendUrlBtn.disabled = false;
+            progress.style.display = 'none';
+            return;
+          }
+
           progressText.textContent = 'Uploading URL...';
 
           const urlId = crypto.randomUUID();
@@ -1716,9 +1850,18 @@ function getHTML() {
               urlId: urlId,
               url: url,
               roomCode: roomCode,
-              timestamp: timestamp
+              timestamp: timestamp,
+              turnstileToken: token
             })
           });
+
+          if (!response.ok) {
+            const result = await response.json();
+            if (response.status === 403) {
+              throw new Error('Bot verification failed. Please refresh and try again.');
+            }
+            throw new Error(result.error || 'URL upload failed');
+          }
 
           const result = await response.json();
 
