@@ -985,6 +985,85 @@ function getHTML(env) {
       color: #6b7280;
       margin-top: 15px;
     }
+
+    /* Cookie Consent Banner */
+    .cookie-banner {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      padding: 20px 24px;
+      max-width: 500px;
+      width: 90%;
+      z-index: 3000;
+      display: none;
+      border: 2px solid #e5e7eb;
+    }
+
+    .cookie-banner.show {
+      display: block;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateX(-50%) translateY(100px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .cookie-banner-content {
+      display: flex;
+      align-items: flex-start;
+      gap: 15px;
+    }
+
+    .cookie-banner-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .cookie-banner-text {
+      flex: 1;
+    }
+
+    .cookie-banner-title {
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 5px;
+      font-size: 15px;
+    }
+
+    .cookie-banner-message {
+      color: #666;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .cookie-banner-close {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 12px;
+    }
+
+    .cookie-banner-close:hover {
+      background: #5568d3;
+      transform: translateY(-1px);
+    }
   </style>
 </head>
 <body>
@@ -1027,8 +1106,13 @@ function getHTML(env) {
     <!-- URL Mode -->
     <div class="section" id="urlSection">
       <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter URL to share:</p>
-      <input type="text" id="urlInput" placeholder="https://example.com" 
-             style="text-transform: none; letter-spacing: normal; margin-bottom: 20px;">
+      <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+        <input type="text" id="urlInput" placeholder="https://example.com"
+               style="flex: 1; text-transform: none; letter-spacing: normal; margin-bottom: 0;">
+        <button id="pasteUrlBtn" style="background: #f3f4f6; color: #667eea; border: 2px solid #667eea; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; white-space: nowrap;">
+          📋 Paste
+        </button>
+      </div>
       <button class="btn" id="sendUrlBtn" disabled>Waiting for receiver...</button>
       <p style="margin-top: 10px; font-size: 12px; color: #999; text-align: center;">
         Receiver will be redirected to this URL
@@ -1083,6 +1167,20 @@ function getHTML(env) {
     </div>
   </div>
 
+  <!-- Cookie Consent Banner -->
+  <div class="cookie-banner" id="cookieBanner">
+    <div class="cookie-banner-content">
+      <div class="cookie-banner-icon">🍪</div>
+      <div class="cookie-banner-text">
+        <div class="cookie-banner-title">Cookie Notice</div>
+        <div class="cookie-banner-message">
+          We use cookies for Turnstile verification to protect against bots. By continuing to use SwiftDrop, you accept our use of cookies.
+        </div>
+        <button class="cookie-banner-close" id="cookieBannerClose">Got it!</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Configuration
     const CONFIG = {
@@ -1123,6 +1221,8 @@ function getHTML(env) {
     const qrModalClose = document.getElementById('qrModalClose');
     const modalRoomCode = document.getElementById('modalRoomCode');
     const qrcodeDiv = document.getElementById('qrcode');
+    const cookieBanner = document.getElementById('cookieBanner');
+    const cookieBannerClose = document.getElementById('cookieBannerClose');
     const sendModeBtn = document.getElementById('sendModeBtn');
     const urlModeBtn = document.getElementById('urlModeBtn');
     const receiveModeBtn = document.getElementById('receiveModeBtn');
@@ -1136,6 +1236,7 @@ function getHTML(env) {
     const fileSizeEl = document.getElementById('fileSize');
     const sendBtn = document.getElementById('sendBtn');
     const urlInput = document.getElementById('urlInput');
+    const pasteUrlBtn = document.getElementById('pasteUrlBtn');
     const sendUrlBtn = document.getElementById('sendUrlBtn');
     const roomInput = document.getElementById('roomInput');
     const joinBtn = document.getElementById('joinBtn');
@@ -1287,7 +1388,78 @@ function getHTML(env) {
       turnstileToken = token;
     };
 
+    // Cookie consent functions
+    function checkCookieConsent() {
+      const dismissed = localStorage.getItem('cookieConsentDismissed');
+      if (!dismissed) {
+        // Show banner after a short delay for better UX
+        setTimeout(() => {
+          cookieBanner.classList.add('show');
+        }, 500);
+      }
+    }
+
+    function dismissCookieBanner() {
+      cookieBanner.classList.remove('show');
+      localStorage.setItem('cookieConsentDismissed', 'true');
+    }
+
+    // URL validation and auto-prepend
+    function validateAndPrepareURL(inputUrl) {
+      let url = inputUrl.trim();
+
+      // Auto-prepend https:// if no protocol
+      if (url && !url.match(/^https?:\/\//i)) {
+        url = 'https://' + url;
+      }
+
+      // Validate URL format with TLD check (2-6 letters, handles .co.uk etc)
+      const urlPattern = /^https?:\/\/([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.[a-zA-Z]{2,6}(\/.*)?$/;
+
+      if (!url || !urlPattern.test(url)) {
+        return { valid: false, url: null };
+      }
+
+      // Additional validation using URL constructor
+      try {
+        new URL(url);
+        return { valid: true, url };
+      } catch (e) {
+        return { valid: false, url: null };
+      }
+    }
+
+    // Paste URL from clipboard
+    async function pasteURLFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        const result = validateAndPrepareURL(text);
+
+        if (result.valid) {
+          urlInput.value = result.url;
+          showToast('URL pasted and validated!');
+
+          // Enable send button if connected
+          if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+            sendUrlBtn.disabled = false;
+            sendUrlBtn.textContent = 'Send URL (P2P)';
+          } else if (ws && ws.readyState === WebSocket.OPEN) {
+            sendUrlBtn.disabled = false;
+            sendUrlBtn.textContent = 'Send URL (via Cloud)';
+          }
+        } else {
+          showError('Invalid URL in clipboard. Please check the format.');
+        }
+      } catch (error) {
+        console.error('Clipboard access error:', error);
+        showError('Could not access clipboard. Please paste manually.');
+      }
+    }
+
     function init() {
+      // Check cookie consent on page load
+      checkCookieConsent();
+
       // Check for auto-join via URL parameter
       const urlParams = new URLSearchParams(window.location.search);
       const autoJoinRoom = urlParams.get('room');
@@ -1787,20 +1959,25 @@ function getHTML(env) {
     }
     
     async function sendUrl() {
-      const url = urlInput.value.trim();
+      const inputUrl = urlInput.value.trim();
 
-      if (!url) {
+      if (!inputUrl) {
         showError('Please enter a URL');
         return;
       }
 
-      // Basic URL validation
-      try {
-        new URL(url);
-      } catch (e) {
-        showError('Please enter a valid URL (e.g., https://example.com)');
+      // Validate and prepare URL (auto-prepend https://)
+      const result = validateAndPrepareURL(inputUrl);
+
+      if (!result.valid) {
+        showError('Invalid URL format. Please enter a valid URL (e.g., example.com or https://example.com)');
         return;
       }
+
+      const url = result.url;
+
+      // Update input with validated URL (with protocol)
+      urlInput.value = url;
 
       sendUrlBtn.disabled = true;
 
@@ -1919,6 +2096,9 @@ function getHTML(env) {
     }
     
     // Event Listeners
+
+    // Cookie Banner - Close button
+    cookieBannerClose.addEventListener('click', dismissCookieBanner);
 
     // QR Modal - Click status to open (sender only)
     status.addEventListener('click', () => {
@@ -2039,20 +2219,29 @@ function getHTML(env) {
     });
     
     sendBtn.addEventListener('click', sendFile);
-    
-    // URL input handling
+
+    // URL input handling - validate on input
     urlInput.addEventListener('input', () => {
-      if (isP2PConnected && dataChannel && dataChannel.readyState === 'open' && urlInput.value.trim()) {
+      const inputValue = urlInput.value.trim();
+
+      if (!inputValue) {
+        sendUrlBtn.disabled = true;
+        return;
+      }
+
+      // Enable button if there's text (validation happens on send)
+      if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
         sendUrlBtn.disabled = false;
         sendUrlBtn.textContent = 'Send URL (P2P)';
-      } else if (urlInput.value.trim()) {
+      } else if (ws && ws.readyState === WebSocket.OPEN) {
         sendUrlBtn.disabled = false;
-        sendUrlBtn.textContent = 'Enter valid URL';
-      } else {
-        sendUrlBtn.disabled = true;
+        sendUrlBtn.textContent = 'Send URL (via Cloud)';
       }
     });
-    
+
+    // Paste URL button
+    pasteUrlBtn.addEventListener('click', pasteURLFromClipboard);
+
     sendUrlBtn.addEventListener('click', sendUrl);
     
     joinBtn.addEventListener('click', () => {
