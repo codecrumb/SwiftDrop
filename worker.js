@@ -464,6 +464,7 @@ function getHTML() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SwiftDrop - P2P File Transfer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -795,6 +796,57 @@ function getHTML() {
         opacity: 1;
       }
     }
+
+    .qr-section {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .qr-toggle-btn {
+      background: white;
+      color: #667eea;
+      border: 2px solid #667eea;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .qr-toggle-btn:hover {
+      background: #f8f9ff;
+      transform: translateY(-1px);
+    }
+
+    .qr-code-container {
+      display: none;
+      margin-top: 15px;
+      padding: 20px;
+      background: white;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+    }
+
+    .qr-code-container.show {
+      display: block;
+    }
+
+    #qrcode {
+      display: inline-block;
+      padding: 10px;
+      background: white;
+      border-radius: 8px;
+    }
+
+    .qr-instructions {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #6b7280;
+    }
   </style>
 </head>
 <body>
@@ -810,7 +862,20 @@ function getHTML() {
         <span class="status-text">Waiting for peer...</span>
       </div>
     </div>
-    
+
+    <!-- QR Code Section (for senders only) -->
+    <div class="qr-section" id="qrSection">
+      <button class="qr-toggle-btn" id="qrToggleBtn">
+        📱 Show QR Code
+      </button>
+      <div class="qr-code-container" id="qrContainer">
+        <div id="qrcode"></div>
+        <div class="qr-instructions">
+          Scan to join this room instantly
+        </div>
+      </div>
+    </div>
+
     <div class="mode-selector">
       <button class="mode-btn active" id="sendModeBtn">📤 Send File</button>
       <button class="mode-btn" id="urlModeBtn">🔗 Send URL</button>
@@ -905,6 +970,10 @@ function getHTML() {
     const statusText = document.getElementById('statusText');
     const roomCodeEl = document.getElementById('roomCode');
     const statusBadge = document.getElementById('statusBadge');
+    const qrSection = document.getElementById('qrSection');
+    const qrToggleBtn = document.getElementById('qrToggleBtn');
+    const qrContainer = document.getElementById('qrContainer');
+    const qrcodeDiv = document.getElementById('qrcode');
     const sendModeBtn = document.getElementById('sendModeBtn');
     const urlModeBtn = document.getElementById('urlModeBtn');
     const receiveModeBtn = document.getElementById('receiveModeBtn');
@@ -1004,10 +1073,60 @@ function getHTML() {
       }
     }
 
+    // Helper function to generate QR code
+    function generateQRCode(roomCode) {
+      // Clear existing QR code
+      qrcodeDiv.innerHTML = '';
+
+      // Generate full URL with room parameter
+      const fullUrl = window.location.origin + window.location.pathname + '?room=' + roomCode;
+
+      // Create QR code
+      new QRCode(qrcodeDiv, {
+        text: fullUrl,
+        width: 200,
+        height: 200,
+        colorDark: '#667eea',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }
+
+    // Toggle QR code visibility
+    function toggleQRCode() {
+      if (qrContainer.classList.contains('show')) {
+        qrContainer.classList.remove('show');
+        qrToggleBtn.textContent = '📱 Show QR Code';
+      } else {
+        qrContainer.classList.add('show');
+        qrToggleBtn.textContent = '📱 Hide QR Code';
+      }
+    }
+
     function init() {
-      roomCode = generateRoomCode();
-      roomCodeEl.textContent = roomCode;
-      connectWebSocket(roomCode);
+      // Check for auto-join via URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const autoJoinRoom = urlParams.get('room');
+
+      if (autoJoinRoom && autoJoinRoom.length === 6) {
+        // Auto-join the room from URL parameter
+        isSender = false;
+        roomCode = autoJoinRoom.toUpperCase();
+        roomCodeEl.textContent = roomCode;
+        connectWebSocket(roomCode);
+        statusText.textContent = 'Joining room...';
+        qrSection.style.display = 'none'; // Hide QR section for receivers
+        showToast('Joining room ' + roomCode + '...');
+
+        // Switch to send mode (receiver can still send files back)
+        sendModeBtn.click();
+      } else {
+        // Normal sender flow
+        roomCode = generateRoomCode();
+        roomCodeEl.textContent = roomCode;
+        generateQRCode(roomCode);
+        connectWebSocket(roomCode);
+      }
     }
     
     function generateRoomCode() {
@@ -1567,6 +1686,10 @@ function getHTML() {
     }
     
     // Event Listeners
+
+    // QR Code toggle
+    qrToggleBtn.addEventListener('click', toggleQRCode);
+
     sendModeBtn.addEventListener('click', () => {
       sendModeBtn.classList.add('active');
       urlModeBtn.classList.remove('active');
@@ -1574,6 +1697,7 @@ function getHTML() {
       sendSection.classList.add('active');
       urlSection.classList.remove('active');
       receiveSection.classList.remove('active');
+      qrSection.style.display = 'block'; // Show QR section in send mode
     });
     
     urlModeBtn.addEventListener('click', () => {
@@ -1583,8 +1707,9 @@ function getHTML() {
       urlSection.classList.add('active');
       sendSection.classList.remove('active');
       receiveSection.classList.remove('active');
+      qrSection.style.display = 'block'; // Show QR section in URL mode
     });
-    
+
     receiveModeBtn.addEventListener('click', () => {
       receiveModeBtn.classList.add('active');
       sendModeBtn.classList.remove('active');
@@ -1592,6 +1717,7 @@ function getHTML() {
       receiveSection.classList.add('active');
       sendSection.classList.remove('active');
       urlSection.classList.remove('active');
+      qrSection.style.display = 'none'; // Hide QR section in receive mode
     });
     
     // File selection - click
@@ -1684,17 +1810,17 @@ function getHTML() {
         showError('Please enter a 6-digit room code');
         return;
       }
-      
+
       isSender = false;
       roomCode = code;
       roomCodeEl.textContent = code;
-      
+
       if (ws) ws.close();
-      
+
       connectWebSocket(code);
       statusText.textContent = 'Connecting to room...';
-      peerInfo.textContent = 'Waiting for sender...';
-      
+      qrSection.style.display = 'none'; // Hide QR section for receivers
+
       sendModeBtn.click();
     });
   </script>
