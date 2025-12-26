@@ -797,55 +797,139 @@ function getHTML() {
       }
     }
 
-    .qr-section {
-      margin-top: 20px;
+    /* Clickable status container (sender only) */
+    .status.clickable {
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .status.clickable:hover {
+      background: #f8faff;
+      border-color: #667eea;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    }
+
+    .status.clickable::after {
+      content: '👆 Click for QR code';
+      position: absolute;
+      bottom: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: #9ca3af;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .status.clickable:hover::after {
+      opacity: 1;
+    }
+
+    /* QR Modal */
+    .qr-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .qr-modal.show {
+      display: flex;
+    }
+
+    .qr-modal-content {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 400px;
+      width: 90%;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        transform: scale(0.9);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .qr-modal-close {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: #f3f4f6;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .qr-modal-close:hover {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .qr-modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 20px;
       text-align: center;
     }
 
-    .qr-toggle-btn {
-      background: white;
+    .qr-modal-room-code {
+      font-size: 36px;
+      font-weight: bold;
+      font-family: monospace;
+      letter-spacing: 6px;
       color: #667eea;
-      border: 2px solid #667eea;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+      text-align: center;
+      margin-bottom: 25px;
     }
 
-    .qr-toggle-btn:hover {
-      background: #f8f9ff;
-      transform: translateY(-1px);
+    .qr-modal-qr {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
     }
 
-    .qr-code-container {
-      display: none;
-      margin-top: 15px;
-      padding: 20px;
+    #qrcode {
+      display: inline-block;
+      padding: 15px;
       background: white;
       border: 2px solid #e5e7eb;
       border-radius: 12px;
     }
 
-    .qr-code-container.show {
-      display: block;
-    }
-
-    #qrcode {
-      display: inline-block;
-      padding: 10px;
-      background: white;
-      border-radius: 8px;
-    }
-
-    .qr-instructions {
-      margin-top: 10px;
-      font-size: 13px;
+    .qr-modal-instructions {
+      text-align: center;
+      font-size: 14px;
       color: #6b7280;
+      margin-top: 15px;
     }
   </style>
 </head>
@@ -860,19 +944,6 @@ function getHTML() {
       <div class="status-badge badge-waiting" id="statusBadge">
         <span class="status-icon">⏳</span>
         <span class="status-text">Waiting for peer...</span>
-      </div>
-    </div>
-
-    <!-- QR Code Section (for senders only) -->
-    <div class="qr-section" id="qrSection">
-      <button class="qr-toggle-btn" id="qrToggleBtn">
-        📱 Show QR Code
-      </button>
-      <div class="qr-code-container" id="qrContainer">
-        <div id="qrcode"></div>
-        <div class="qr-instructions">
-          Scan to join this room instantly
-        </div>
       </div>
     </div>
 
@@ -932,8 +1003,21 @@ function getHTML() {
     
     <div class="error" id="error"></div>
   </div>
-  
+
   <div class="toast" id="toast"></div>
+
+  <!-- QR Code Modal -->
+  <div class="qr-modal" id="qrModal">
+    <div class="qr-modal-content">
+      <button class="qr-modal-close" id="qrModalClose">✕</button>
+      <div class="qr-modal-title">Join this room</div>
+      <div class="qr-modal-room-code" id="modalRoomCode">------</div>
+      <div class="qr-modal-qr">
+        <div id="qrcode"></div>
+      </div>
+      <div class="qr-modal-instructions">Scan to join instantly</div>
+    </div>
+  </div>
 
   <script>
     // Configuration
@@ -970,9 +1054,9 @@ function getHTML() {
     const statusText = document.getElementById('statusText');
     const roomCodeEl = document.getElementById('roomCode');
     const statusBadge = document.getElementById('statusBadge');
-    const qrSection = document.getElementById('qrSection');
-    const qrToggleBtn = document.getElementById('qrToggleBtn');
-    const qrContainer = document.getElementById('qrContainer');
+    const qrModal = document.getElementById('qrModal');
+    const qrModalClose = document.getElementById('qrModalClose');
+    const modalRoomCode = document.getElementById('modalRoomCode');
     const qrcodeDiv = document.getElementById('qrcode');
     const sendModeBtn = document.getElementById('sendModeBtn');
     const urlModeBtn = document.getElementById('urlModeBtn');
@@ -1073,7 +1157,7 @@ function getHTML() {
       }
     }
 
-    // Helper function to generate QR code
+    // Helper function to generate QR code in modal
     function generateQRCode(roomCode) {
       // Clear existing QR code
       qrcodeDiv.innerHTML = '';
@@ -1084,23 +1168,26 @@ function getHTML() {
       // Create QR code
       new QRCode(qrcodeDiv, {
         text: fullUrl,
-        width: 200,
-        height: 200,
+        width: 220,
+        height: 220,
         colorDark: '#667eea',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
       });
     }
 
-    // Toggle QR code visibility
-    function toggleQRCode() {
-      if (qrContainer.classList.contains('show')) {
-        qrContainer.classList.remove('show');
-        qrToggleBtn.textContent = '📱 Show QR Code';
-      } else {
-        qrContainer.classList.add('show');
-        qrToggleBtn.textContent = '📱 Hide QR Code';
-      }
+    // Open QR modal
+    function openQRModal() {
+      if (!isSender) return; // Only senders can open modal
+      modalRoomCode.textContent = roomCode;
+      qrModal.classList.add('show');
+      document.body.style.overflow = 'hidden'; // Prevent background scroll
+    }
+
+    // Close QR modal
+    function closeQRModal() {
+      qrModal.classList.remove('show');
+      document.body.style.overflow = ''; // Restore scroll
     }
 
     function init() {
@@ -1115,17 +1202,20 @@ function getHTML() {
         roomCodeEl.textContent = roomCode;
         connectWebSocket(roomCode);
         statusText.textContent = 'Joining room...';
-        qrSection.style.display = 'none'; // Hide QR section for receivers
         showToast('Joining room ' + roomCode + '...');
 
         // Switch to send mode (receiver can still send files back)
         sendModeBtn.click();
       } else {
         // Normal sender flow
+        isSender = true;
         roomCode = generateRoomCode();
         roomCodeEl.textContent = roomCode;
-        generateQRCode(roomCode);
+        generateQRCode(roomCode); // Generate QR code for modal
         connectWebSocket(roomCode);
+
+        // Make status clickable for senders
+        status.classList.add('clickable');
       }
     }
     
@@ -1687,8 +1777,29 @@ function getHTML() {
     
     // Event Listeners
 
-    // QR Code toggle
-    qrToggleBtn.addEventListener('click', toggleQRCode);
+    // QR Modal - Click status to open (sender only)
+    status.addEventListener('click', () => {
+      if (isSender) {
+        openQRModal();
+      }
+    });
+
+    // QR Modal - Close button
+    qrModalClose.addEventListener('click', closeQRModal);
+
+    // QR Modal - Click outside to close
+    qrModal.addEventListener('click', (e) => {
+      if (e.target === qrModal) {
+        closeQRModal();
+      }
+    });
+
+    // QR Modal - Escape key to close
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && qrModal.classList.contains('show')) {
+        closeQRModal();
+      }
+    });
 
     sendModeBtn.addEventListener('click', () => {
       sendModeBtn.classList.add('active');
@@ -1697,9 +1808,8 @@ function getHTML() {
       sendSection.classList.add('active');
       urlSection.classList.remove('active');
       receiveSection.classList.remove('active');
-      qrSection.style.display = 'block'; // Show QR section in send mode
     });
-    
+
     urlModeBtn.addEventListener('click', () => {
       urlModeBtn.classList.add('active');
       sendModeBtn.classList.remove('active');
@@ -1707,7 +1817,6 @@ function getHTML() {
       urlSection.classList.add('active');
       sendSection.classList.remove('active');
       receiveSection.classList.remove('active');
-      qrSection.style.display = 'block'; // Show QR section in URL mode
     });
 
     receiveModeBtn.addEventListener('click', () => {
@@ -1717,7 +1826,6 @@ function getHTML() {
       receiveSection.classList.add('active');
       sendSection.classList.remove('active');
       urlSection.classList.remove('active');
-      qrSection.style.display = 'none'; // Hide QR section in receive mode
     });
     
     // File selection - click
@@ -1819,7 +1927,9 @@ function getHTML() {
 
       connectWebSocket(code);
       statusText.textContent = 'Connecting to room...';
-      qrSection.style.display = 'none'; // Hide QR section for receivers
+
+      // Receivers don't get clickable status
+      status.classList.remove('clickable');
 
       sendModeBtn.click();
     });
