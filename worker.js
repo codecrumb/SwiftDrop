@@ -61,6 +61,24 @@ export default {
             });
           }
 
+          // Server-side URL protocol validation (whitelist http/https only)
+          try {
+            const urlObj = new URL(targetUrl);
+            if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+              return new Response(JSON.stringify({
+                error: 'Invalid URL protocol (only http/https allowed)'
+              }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+          } catch (e) {
+            return new Response(JSON.stringify({ error: 'Invalid URL' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
           // Verify Turnstile token
           const isValid = await verifyTurnstile(turnstileToken, env);
           if (!isValid) {
@@ -118,6 +136,17 @@ export default {
           });
         }
 
+        // Server-side file size validation (20MB limit)
+        const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+        if (file.size > MAX_FILE_SIZE) {
+          return new Response(JSON.stringify({
+            error: 'File too large (max 20MB)'
+          }), {
+            status: 413, // Payload Too Large
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
         // Generate unique file ID
         const fileId = crypto.randomUUID();
         const timestamp = Date.now();
@@ -129,7 +158,7 @@ export default {
           },
           customMetadata: {
             roomCode,
-            fileName: fileName || file.name,
+            fileName: sanitizeFilename(fileName || file.name),
             uploadedAt: timestamp.toString(),
             expiresAt: (timestamp + 20 * 60 * 1000).toString() // 20 minutes
           }
@@ -221,7 +250,7 @@ export default {
 
         const headers = new Headers();
         object.writeHttpMetadata(headers);
-        headers.set('Content-Disposition', `attachment; filename="${object.customMetadata?.fileName || 'download'}"`);
+        headers.set('Content-Disposition', `attachment; filename="${sanitizeFilename(object.customMetadata?.fileName || 'download')}"`);
         headers.set('Access-Control-Allow-Origin', '*');
 
         // Read the entire file into array buffer (files are < 20MB so this is safe)
@@ -265,6 +294,19 @@ export default {
     console.log(`[Cleanup] Finished. Deleted ${deleted} expired files.`);
   }
 };
+
+/**
+ * Sanitize filename to prevent XSS and path traversal attacks
+ */
+function sanitizeFilename(filename) {
+  if (!filename) return 'download';
+
+  return filename
+    .replace(/[/\\]/g, '') // Remove path separators
+    .replace(/\.\./g, '') // Remove parent directory references
+    .replace(/[^a-zA-Z0-9._-]/g, '_') // Only allow safe chars
+    .substring(0, 255); // Limit length
+}
 
 /**
  * Verify Turnstile token for bot protection
@@ -1420,9 +1462,13 @@ function getHTML(env) {
         return { valid: false, url: null };
       }
 
-      // Additional validation using URL constructor
+      // Additional validation using URL constructor and protocol whitelist
       try {
-        new URL(url);
+        const urlObj = new URL(url);
+        // Only allow http: and https: protocols (prevent javascript:, data:, file:, etc.)
+        if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+          return { valid: false, url: null };
+        }
         return { valid: true, url };
       } catch (e) {
         return { valid: false, url: null };
