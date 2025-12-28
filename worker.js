@@ -7,8 +7,30 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Manual cleanup trigger (for testing)
+    // Manual cleanup trigger (protected with API key)
     if (url.pathname === '/cleanup' && request.method === 'POST') {
+      // Require API key for manual cleanup
+      const apiKey = request.headers.get('X-API-Key');
+      const expectedKey = env.CLEANUP_API_KEY;
+
+      if (!expectedKey) {
+        return new Response(JSON.stringify({
+          error: 'Cleanup endpoint disabled (CLEANUP_API_KEY not configured)'
+        }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!apiKey || apiKey !== expectedKey) {
+        return new Response(JSON.stringify({
+          error: 'Unauthorized - Invalid or missing API key'
+        }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       const deleted = await cleanupExpiredFiles(env);
       return new Response(JSON.stringify({
         success: true,
@@ -351,22 +373,19 @@ async function cleanupExpiredFiles(env) {
     let cursor;
     let truncated = true;
 
-    // List all objects in R2 bucket
+    // List all objects in R2 bucket with metadata (efficient - no extra get() calls)
     do {
       const listed = await env.FILE_STORAGE.list({
         cursor: cursor,
-        limit: 1000
+        limit: 1000,
+        include: ['customMetadata'] // Include metadata in list response
       });
 
       // Check each object for expiration
       for (const object of listed.objects) {
         try {
-          // Get the full object to read metadata
-          const fullObject = await env.FILE_STORAGE.get(object.key);
-
-          if (!fullObject) continue;
-
-          const expiresAt = parseInt(fullObject.customMetadata?.expiresAt || '0');
+          // Read metadata directly from list() response (no get() needed!)
+          const expiresAt = parseInt(object.customMetadata?.expiresAt || '0');
 
           if (expiresAt && now > expiresAt) {
             // File has expired, delete it
