@@ -123,6 +123,14 @@ export default {
             }
           });
 
+          // Analytics: Track URL share via cloud relay
+          console.log(JSON.stringify({
+            event: 'url_shared',
+            method: 'cloud_relay',
+            roomCode,
+            timestamp: new Date().toISOString()
+          }));
+
           return new Response(JSON.stringify({
             success: true,
             urlId,
@@ -186,6 +194,16 @@ export default {
           }
         });
 
+        // Analytics: Track file upload via cloud relay
+        console.log(JSON.stringify({
+          event: 'file_upload',
+          method: 'cloud_relay',
+          fileSize: file.size,
+          fileType: file.type || 'unknown',
+          roomCode,
+          timestamp: new Date().toISOString()
+        }));
+
         return new Response(JSON.stringify({
           success: true,
           fileId,
@@ -230,6 +248,14 @@ export default {
 
         // Read the URL from the object
         const redirectUrl = await object.text();
+
+        // Analytics: Track URL redirect (successful download)
+        console.log(JSON.stringify({
+          event: 'url_redirect',
+          method: 'cloud_relay',
+          roomCode: object.customMetadata?.roomCode,
+          timestamp: new Date().toISOString()
+        }));
 
         // Delete the URL object after use
         try {
@@ -282,6 +308,16 @@ export default {
 
         // Read the entire file into array buffer (files are < 20MB so this is safe)
         const arrayBuffer = await object.arrayBuffer();
+
+        // Analytics: Track file download via cloud relay
+        console.log(JSON.stringify({
+          event: 'file_download',
+          method: 'cloud_relay',
+          fileSize: arrayBuffer.byteLength,
+          fileName: object.customMetadata?.fileName || 'unknown',
+          roomCode: object.customMetadata?.roomCode,
+          timestamp: new Date().toISOString()
+        }));
 
         // Now delete the file from R2 (properly awaited)
         try {
@@ -460,8 +496,16 @@ export class SignalingRoom {
     // Generate unique session ID
     const sessionId = crypto.randomUUID();
     this.sessions.set(sessionId, { ws: server, joinedAt: Date.now() });
-    
+
     console.log(`[Room] New peer: ${sessionId}. Total: ${this.sessions.size}`);
+
+    // Analytics: Track P2P connection attempt
+    console.log(JSON.stringify({
+      event: 'peer_connected',
+      method: 'p2p',
+      peersInRoom: this.sessions.size,
+      timestamp: new Date().toISOString()
+    }));
     
     // Send connection confirmation
     server.send(JSON.stringify({
@@ -1069,7 +1113,7 @@ function getHTML(env) {
     }
 
     .qr-modal-content {
-      background: white;
+      background: var(--container-bg);
       border-radius: 20px;
       padding: 40px;
       max-width: 400px;
@@ -1077,6 +1121,7 @@ function getHTML(env) {
       position: relative;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
       animation: modalSlideIn 0.3s ease-out;
+      transition: background 0.3s ease;
     }
 
     @keyframes modalSlideIn {
@@ -1094,14 +1139,14 @@ function getHTML(env) {
       position: absolute;
       top: 15px;
       right: 15px;
-      background: #f3f4f6;
+      background: var(--file-info-bg);
       border: none;
       width: 32px;
       height: 32px;
       border-radius: 50%;
       cursor: pointer;
       font-size: 18px;
-      color: #6b7280;
+      color: var(--text-secondary);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1109,16 +1154,17 @@ function getHTML(env) {
     }
 
     .qr-modal-close:hover {
-      background: #e5e7eb;
-      color: #374151;
+      background: var(--border-color);
+      color: var(--text-primary);
     }
 
     .qr-modal-title {
       font-size: 20px;
       font-weight: 700;
-      color: #333;
+      color: var(--text-primary);
       margin-bottom: 20px;
       text-align: center;
+      transition: color 0.3s ease;
     }
 
     .qr-modal-room-code {
@@ -1147,9 +1193,28 @@ function getHTML(env) {
 
     .qr-modal-instructions {
       text-align: center;
+      color: var(--text-secondary);
       font-size: 14px;
-      color: #6b7280;
-      margin-top: 15px;
+      transition: color 0.3s ease;
+    }
+
+    /* Paste Button */
+    .paste-btn {
+      background: var(--file-info-bg);
+      color: #667eea;
+      border: 2px solid #667eea;
+      padding: 12px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+      transition: all 0.3s ease;
+    }
+
+    .paste-btn:hover {
+      background: #667eea;
+      color: white;
     }
 
     /* Cookie Consent Banner */
@@ -1276,7 +1341,7 @@ function getHTML(env) {
       <div style="display: flex; gap: 8px; margin-bottom: 15px;">
         <input type="text" id="urlInput" placeholder="https://example.com"
                style="flex: 1; text-transform: none; letter-spacing: normal; margin-bottom: 0;">
-        <button id="pasteUrlBtn" style="background: #f3f4f6; color: #667eea; border: 2px solid #667eea; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; white-space: nowrap;">
+        <button id="pasteUrlBtn" class="paste-btn">
           📋 Paste
         </button>
       </div>
