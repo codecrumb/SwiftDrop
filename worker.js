@@ -130,7 +130,7 @@ export default {
           }), {
             headers: {
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*'
+              ...getCorsHeaders(request)
             }
           });
         }
@@ -162,7 +162,7 @@ export default {
         const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
         if (file.size > MAX_FILE_SIZE) {
           return new Response(JSON.stringify({
-            error: 'File too large (max 20MB)'
+            error: 'File too large (max 20MB). P2P mode supports larger files when both peers are connected.'
           }), {
             status: 413, // Payload Too Large
             headers: { 'Content-Type': 'application/json' }
@@ -193,7 +193,7 @@ export default {
         }), {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+            ...getCorsHeaders(request)
           }
         });
       } catch (error) {
@@ -273,7 +273,12 @@ export default {
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set('Content-Disposition', `attachment; filename="${sanitizeFilename(object.customMetadata?.fileName || 'download')}"`);
-        headers.set('Access-Control-Allow-Origin', '*');
+
+        // Add CORS headers for allowed origins
+        const corsHeaders = getCorsHeaders(request);
+        Object.entries(corsHeaders).forEach(([key, value]) => {
+          headers.set(key, value);
+        });
 
         // Read the entire file into array buffer (files are < 20MB so this is safe)
         const arrayBuffer = await object.arrayBuffer();
@@ -298,11 +303,7 @@ export default {
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        }
+        headers: getCorsHeaders(request)
       });
     }
 
@@ -316,6 +317,30 @@ export default {
     console.log(`[Cleanup] Finished. Deleted ${deleted} expired files.`);
   }
 };
+
+/**
+ * Get CORS headers for allowed origins only
+ */
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin');
+  const allowedOrigins = [
+    'https://f.REDACTED.com',
+    'https://swiftdrop.REDACTED.com',
+    'https://swiftdrop.vop.workers.dev'
+  ];
+
+  // Check if origin is in allowed list
+  if (origin && allowedOrigins.includes(origin)) {
+    return {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-API-Key'
+    };
+  }
+
+  // No CORS headers if origin not allowed (will block cross-origin requests)
+  return {};
+}
 
 /**
  * Sanitize filename to prevent XSS and path traversal attacks
@@ -1272,7 +1297,10 @@ function getHTML(env) {
     let p2pTimeout = null;
     let isP2PConnected = false;
     let turnstileToken = null;
-    
+    let wsReconnectAttempts = 0;
+    let wsReconnectTimeout = null;
+    let isIntentionalClose = false;
+
     // Elements
     const status = document.getElementById('status');
     const statusText = document.getElementById('statusText');
@@ -1562,27 +1590,54 @@ function getHTML(env) {
       return code;
     }
     
-    function connectWebSocket(room) {
+    function connectWebSocket(room, isReconnect = false) {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(\`\${protocol}//\${window.location.host}/ws?room=\${room}\`);
-      
+
       ws.onopen = () => {
         console.log('✅ WebSocket connected');
-        statusText.textContent = isSender ? 'Share this code with receiver:' : 'Connected to room:';
+        wsReconnectAttempts = 0; // Reset reconnect counter on successful connection
+
+        if (isReconnect) {
+          statusText.textContent = 'Reconnected!';
+          showToast('Connection restored!');
+        } else {
+          statusText.textContent = isSender ? 'Share this code with receiver:' : 'Connected to room:';
+        }
       };
-      
+
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         handleSignalingMessage(data);
       };
-      
+
       ws.onerror = (error) => {
         console.error('❌ WebSocket error:', error);
-        showError('Connection error. Please refresh.');
       };
-      
-      ws.onclose = () => {
-        console.log('WebSocket closed');
+
+      ws.onclose = (event) => {
+        console.log('WebSocket closed', event.code, event.reason);
+
+        // Don't reconnect if close was intentional or max retries exceeded
+        if (isIntentionalClose || wsReconnectAttempts >= 5) {
+          if (wsReconnectAttempts >= 5) {
+            showError('Connection lost. Please refresh the page.');
+          }
+          return;
+        }
+
+        // Attempt reconnection with exponential backoff
+        wsReconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts - 1), 16000); // 1s, 2s, 4s, 8s, 16s
+
+        console.log(\`🔄 Reconnecting in \${delay/1000}s (attempt \${wsReconnectAttempts}/5)...\`);
+        statusText.textContent = \`Reconnecting in \${delay/1000}s...\`;
+        showToast(\`Connection lost. Reconnecting (attempt \${wsReconnectAttempts}/5)...\`);
+
+        wsReconnectTimeout = setTimeout(() => {
+          console.log(\`🔄 Attempting reconnect \${wsReconnectAttempts}/5\`);
+          connectWebSocket(room, true);
+        }, delay);
       };
     }
     
@@ -1978,7 +2033,18 @@ function getHTML(env) {
         
       } catch (error) {
         console.error('❌ Fallback upload error:', error);
-        showError('Upload failed. Please try again.');
+
+        // Provide helpful error message based on error type
+        let errorMessage = error.message || 'Upload failed';
+        if (error.message && error.message.includes('NetworkError')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message && error.message.includes('Bot verification')) {
+          errorMessage = error.message; // Use specific bot verification error
+        } else if (!error.message || error.message === 'Upload failed') {
+          errorMessage = 'Upload failed. Please check your connection and try again.';
+        }
+
+        showError(errorMessage);
         sendBtn.disabled = false;
         progress.style.display = 'none';
       }
@@ -2130,7 +2196,20 @@ function getHTML(env) {
           }
         } catch (error) {
           console.error('❌ URL fallback error:', error);
-          showError('Failed to share URL. Please try again.');
+
+          // Provide helpful error message based on error type
+          let errorMessage = error.message || 'Failed to share URL';
+          if (error.message && error.message.includes('NetworkError')) {
+            errorMessage = 'Network error. Please check your connection and try again.';
+          } else if (error.message && error.message.includes('Bot verification')) {
+            errorMessage = error.message; // Use specific bot verification error
+          } else if (error.message && error.message.includes('Invalid URL protocol')) {
+            errorMessage = error.message; // Use specific protocol error
+          } else if (!error.message || error.message === 'Failed to share URL') {
+            errorMessage = 'Failed to share URL. Please check your connection and try again.';
+          }
+
+          showError(errorMessage);
           sendUrlBtn.disabled = false;
           progress.style.display = 'none';
         }
@@ -2320,7 +2399,12 @@ function getHTML(env) {
       roomCode = code;
       roomCodeEl.textContent = code;
 
-      if (ws) ws.close();
+      // Mark as intentional close to prevent reconnection
+      if (ws) {
+        isIntentionalClose = true;
+        ws.close();
+        isIntentionalClose = false;
+      }
 
       connectWebSocket(code);
       statusText.textContent = 'Connecting to room...';
