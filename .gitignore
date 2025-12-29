@@ -25,3 +25,4 @@ thumbs.db
 *.keystore
 *.iml
 *.class
+wrangler.toml.local

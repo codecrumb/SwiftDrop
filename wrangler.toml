@@ -17,7 +17,6 @@ bucket_name = "swiftdrop"
 # Durable Object migrations
 [[migrations]]
 tag = "v2"
-deleted_classes = ["SSEConnectionManager"]
 new_sqlite_classes = ["SignalingRoom"]
 
 # Observability settings
