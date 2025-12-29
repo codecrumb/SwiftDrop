@@ -606,65 +606,136 @@ function getHTML(env) {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
+    :root {
+      --bg-gradient-start: #667eea;
+      --bg-gradient-end: #764ba2;
+      --container-bg: #ffffff;
+      --text-primary: #333333;
+      --text-secondary: #666666;
+      --text-tertiary: #999999;
+      --border-color: #dddddd;
+      --input-bg: #ffffff;
+      --status-bg: #f0f9ff;
+      --status-border: #7dd3fc;
+      --status-connected-bg: #f0fdf4;
+      --status-connected-border: #86efac;
+      --status-relay-bg: #dbeafe;
+      --status-relay-border: #3b82f6;
+      --status-connecting-bg: #fef3c7;
+      --status-connecting-border: #fbbf24;
+      --upload-area-hover: #f8f9ff;
+      --file-info-bg: #f9fafb;
+      --shadow-color: rgba(0, 0, 0, 0.3);
+    }
+
+    body.dark-mode {
+      --bg-gradient-start: #1e1b4b;
+      --bg-gradient-end: #312e81;
+      --container-bg: #1f2937;
+      --text-primary: #f3f4f6;
+      --text-secondary: #d1d5db;
+      --text-tertiary: #9ca3af;
+      --border-color: #374151;
+      --input-bg: #111827;
+      --status-bg: #1e3a5f;
+      --status-border: #3b82f6;
+      --status-connected-bg: #1e4d2b;
+      --status-connected-border: #22c55e;
+      --status-relay-bg: #1e3a5f;
+      --status-relay-border: #60a5fa;
+      --status-connecting-bg: #422006;
+      --status-connecting-border: #fbbf24;
+      --upload-area-hover: #374151;
+      --file-info-bg: #374151;
+      --shadow-color: rgba(0, 0, 0, 0.6);
+    }
+
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
-    
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      transition: background 0.3s ease;
     }
-    
+
     .container {
-      background: white;
+      background: var(--container-bg);
       border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      box-shadow: 0 20px 60px var(--shadow-color);
       padding: 40px;
       max-width: 500px;
       width: 100%;
+      position: relative;
+      transition: background 0.3s ease, box-shadow 0.3s ease;
     }
     
     h1 {
-      color: #333;
+      color: var(--text-primary);
       margin-bottom: 10px;
       font-size: 28px;
+      transition: color 0.3s ease;
     }
-    
+
     .subtitle {
-      color: #666;
+      color: var(--text-secondary);
       margin-bottom: 30px;
       font-size: 14px;
+      transition: color 0.3s ease;
     }
-    
+
+    .dark-mode-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: var(--border-color);
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .dark-mode-toggle:hover {
+      transform: scale(1.1);
+    }
+
     .status {
-      background: #f0f9ff;
-      border: 2px solid #7dd3fc;
+      background: var(--status-bg);
+      border: 2px solid var(--status-border);
       border-radius: 8px;
       padding: 15px;
       margin-bottom: 20px;
       text-align: center;
+      transition: background 0.3s ease, border-color 0.3s ease;
     }
 
     .status.connected {
-      background: #f0fdf4;
-      border-color: #86efac;
+      background: var(--status-connected-bg);
+      border-color: var(--status-connected-border);
     }
 
     .status.relay {
-      background: #dbeafe;
-      border-color: #3b82f6;
+      background: var(--status-relay-bg);
+      border-color: var(--status-relay-border);
     }
 
     .status.connecting {
-      background: #fef3c7;
-      border-color: #fbbf24;
+      background: var(--status-connecting-bg);
+      border-color: var(--status-connecting-border);
     }
 
     .status-badge {
@@ -713,24 +784,26 @@ function getHTML(env) {
     
     .peer-info {
       font-size: 13px;
-      color: #666;
+      color: var(--text-secondary);
       margin-top: 8px;
+      transition: color 0.3s ease;
     }
-    
+
     .mode-selector {
       display: flex;
       gap: 10px;
       margin-bottom: 20px;
     }
-    
+
     .mode-btn {
       flex: 1;
       padding: 12px;
-      border: 2px solid #ddd;
-      background: white;
+      border: 2px solid var(--border-color);
+      background: var(--container-bg);
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
+      color: var(--text-primary);
       transition: all 0.2s;
     }
     
@@ -751,7 +824,7 @@ function getHTML(env) {
     input[type="text"] {
       width: 100%;
       padding: 12px;
-      border: 2px solid #ddd;
+      border: 2px solid var(--border-color);
       border-radius: 8px;
       font-size: 16px;
       font-family: monospace;
@@ -759,26 +832,30 @@ function getHTML(env) {
       letter-spacing: 2px;
       text-align: center;
       margin-bottom: 15px;
+      background: var(--input-bg);
+      color: var(--text-primary);
+      transition: all 0.3s ease;
     }
-    
+
     input[type="text"]:focus {
       outline: none;
       border-color: #667eea;
     }
-    
+
     .upload-area {
-      border: 3px dashed #ddd;
+      border: 3px dashed var(--border-color);
       border-radius: 12px;
       padding: 40px 20px;
       text-align: center;
       cursor: pointer;
       transition: all 0.3s;
       margin-bottom: 15px;
+      color: var(--text-primary);
     }
-    
+
     .upload-area:hover {
       border-color: #667eea;
-      background: #f8f9ff;
+      background: var(--upload-area-hover);
     }
     
     .upload-icon {
@@ -858,23 +935,26 @@ function getHTML(env) {
     }
     
     .file-info {
-      background: #f9fafb;
+      background: var(--file-info-bg);
       border-radius: 8px;
       padding: 15px;
       margin-bottom: 15px;
       display: none;
+      transition: background 0.3s ease;
     }
-    
+
     .file-name {
       font-weight: 600;
-      color: #333;
+      color: var(--text-primary);
       word-break: break-all;
       margin-bottom: 5px;
+      transition: color 0.3s ease;
     }
-    
+
     .file-size {
-      color: #666;
+      color: var(--text-secondary);
       font-size: 14px;
+      transition: color 0.3s ease;
     }
     
     .download-area {
@@ -1154,6 +1234,7 @@ function getHTML(env) {
 </head>
 <body>
   <div class="container">
+    <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode">🌙</button>
     <h1>🚀 SwiftDrop</h1>
     <p class="subtitle">Instant P2P file transfer • Files auto-delete after download</p>
     
@@ -1268,6 +1349,24 @@ function getHTML(env) {
   </div>
 
   <script>
+    // Dark Mode
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const savedTheme = localStorage.getItem('theme');
+
+    // Apply saved theme or default to light mode
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark-mode');
+      darkModeToggle.textContent = '☀️';
+    }
+
+    // Toggle dark mode
+    darkModeToggle.addEventListener('click', () => {
+      document.body.classList.toggle('dark-mode');
+      const isDark = document.body.classList.contains('dark-mode');
+      darkModeToggle.textContent = isDark ? '☀️' : '🌙';
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    });
+
     // Configuration
     const CONFIG = {
       iceServers: [
