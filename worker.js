@@ -647,6 +647,12 @@ function getHTML(env) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SwiftDrop - P2P File Transfer</title>
+  <link rel="icon" href="https://faviconser.pages.dev/swiftdrop/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://faviconser.pages.dev/swiftdrop/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://faviconser.pages.dev/swiftdrop/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://faviconser.pages.dev/swiftdrop/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://faviconser.pages.dev/swiftdrop/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="https://faviconser.pages.dev/swiftdrop/icon-512.png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
