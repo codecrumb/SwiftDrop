@@ -1,5 +1,4 @@
 name = "swiftdrop"
-account_id = "REDACTED"
 workers_dev = true
 compatibility_date = "2024-11-24"
 main = "worker.js"
