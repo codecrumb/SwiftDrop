@@ -138,7 +138,7 @@ export default {
           }), {
             headers: {
               'Content-Type': 'application/json',
-              ...getCorsHeaders(request)
+              ...getCorsHeaders(request, env)
             }
           });
         }
@@ -211,7 +211,7 @@ export default {
         }), {
           headers: {
             'Content-Type': 'application/json',
-            ...getCorsHeaders(request)
+            ...getCorsHeaders(request, env)
           }
         });
       } catch (error) {
@@ -301,7 +301,7 @@ export default {
         headers.set('Content-Disposition', `attachment; filename="${sanitizeFilename(object.customMetadata?.fileName || 'download')}"`);
 
         // Add CORS headers for allowed origins
-        const corsHeaders = getCorsHeaders(request);
+        const corsHeaders = getCorsHeaders(request, env);
         Object.entries(corsHeaders).forEach(([key, value]) => {
           headers.set(key, value);
         });
@@ -339,7 +339,7 @@ export default {
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: getCorsHeaders(request)
+        headers: getCorsHeaders(request, env)
       });
     }
 
@@ -357,13 +357,9 @@ export default {
 /**
  * Get CORS headers for allowed origins only
  */
-function getCorsHeaders(request) {
+function getCorsHeaders(request, env) {
   const origin = request.headers.get('Origin');
-  const allowedOrigins = [
-    'https://f.REDACTED.com',
-    'https://swiftdrop.REDACTED.com',
-    'https://swiftdrop.vop.workers.dev'
-  ];
+  const allowedOrigins = (env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
 
   // Check if origin is in allowed list
   if (origin && allowedOrigins.includes(origin)) {
