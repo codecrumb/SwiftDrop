@@ -1301,9 +1301,49 @@ function getHTML(env) {
       background: #5568d3;
       transform: translateY(-1px);
     }
+
+    /* Full-page drag overlay */
+    #dragOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(15, 10, 40, 0.88);
+      backdrop-filter: blur(3px);
+      border: 4px dashed rgba(167, 139, 250, 0.7);
+      pointer-events: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    #dragOverlay.active {
+      display: flex;
+      pointer-events: all;
+    }
+    #dragOverlay .drag-overlay-icon {
+      font-size: 64px;
+      line-height: 1;
+    }
+    #dragOverlay .drag-overlay-text {
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    #dragOverlay .drag-overlay-sub {
+      font-size: 14px;
+      color: #c4b5fd;
+    }
   </style>
 </head>
 <body>
+  <!-- Full-page drag overlay -->
+  <div id="dragOverlay">
+    <div class="drag-overlay-icon">📁</div>
+    <div class="drag-overlay-text">Drop your file anywhere!</div>
+    <div class="drag-overlay-sub">Release to select this file</div>
+  </div>
+
   <div class="container">
     <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode">🌙</button>
     <h1>🚀 SwiftDrop</h1>
@@ -2468,19 +2508,72 @@ function getHTML(env) {
     // File selection - click
     uploadArea.addEventListener('click', () => fileInput.click());
     
-    // Drag and drop support
+    // Full-page drag overlay
+    const dragOverlay = document.getElementById('dragOverlay');
+    let dragCounter = 0;
+
+    document.addEventListener('dragenter', (e) => {
+      if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+        dragCounter++;
+        dragOverlay.classList.add('active');
+      }
+    });
+
+    document.addEventListener('dragleave', (e) => {
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        dragOverlay.classList.remove('active');
+      }
+    });
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    dragOverlay.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dragOverlay.classList.remove('active');
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        // Switch to send mode if not already there
+        sendModeBtn.click();
+
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        fileInput.files = dataTransfer.files;
+        selectedFile = files[0];
+        fileNameEl.textContent = selectedFile.name;
+        fileSizeEl.textContent = formatFileSize(selectedFile.size);
+        fileInfo.style.display = 'block';
+
+        if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+          updateSendButton('p2p');
+        } else if (ws && ws.readyState === WebSocket.OPEN) {
+          updateSendButton('connecting');
+        } else {
+          updateSendButton('waiting');
+        }
+
+        showToast('File selected: ' + selectedFile.name);
+      }
+    });
+
+    // Drag and drop support (small upload area still works too)
     uploadArea.addEventListener('dragover', (e) => {
       e.preventDefault();
       uploadArea.style.borderColor = '#667eea';
       uploadArea.style.background = '#f8f9ff';
     });
-    
+
     uploadArea.addEventListener('dragleave', (e) => {
       e.preventDefault();
       uploadArea.style.borderColor = '#ddd';
       uploadArea.style.background = '';
     });
-    
+
     uploadArea.addEventListener('drop', (e) => {
       e.preventDefault();
       uploadArea.style.borderColor = '#ddd';
