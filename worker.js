@@ -2499,6 +2499,7 @@ function getHTML(env) {
       receiveSection.classList.add('active');
       sendSection.classList.remove('active');
       urlSection.classList.remove('active');
+      roomInput.focus();
     });
     
     // File selection - click
