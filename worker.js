@@ -1396,7 +1396,7 @@ function getHTML(env) {
     <!-- Receive Mode -->
     <div class="section" id="receiveSection">
       <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter the 6-digit code from sender:</p>
-      <input type="text" id="roomInput" placeholder="ABC123" maxlength="6">
+      <input type="text" id="roomInput" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]*">
       <button class="btn" id="joinBtn">Join Room</button>
     </div>
     
@@ -1788,7 +1788,7 @@ function getHTML(env) {
     }
     
     function generateRoomCode() {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const chars = '0123456789';
       let code = '';
       for (let i = 0; i < 6; i++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -2649,7 +2649,7 @@ function getHTML(env) {
     sendUrlBtn.addEventListener('click', sendUrl);
     
     joinBtn.addEventListener('click', () => {
-      const code = roomInput.value.trim().toUpperCase();
+      const code = roomInput.value.trim().replace(/\D/g, '');
       if (code.length !== 6) {
         showError('Please enter a 6-digit room code');
         return;
