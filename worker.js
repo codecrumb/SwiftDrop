@@ -612,6 +612,15 @@ export class SignalingRoom {
         }, fromSessionId);
         break;
 
+      case 'text-fallback':
+        // Relay plain text directly to other peer (no R2 needed, text is small)
+        this.broadcast({
+          type: 'text-fallback',
+          content: data.content,
+          from: fromSessionId
+        }, fromSessionId);
+        break;
+
       case 'ping':
         // Keep-alive
         const session = this.sessions.get(fromSessionId);
@@ -905,6 +914,40 @@ function getHTML(env) {
     input[type="text"]:focus {
       outline: none;
       border-color: #667eea;
+    }
+
+    textarea.text-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: monospace;
+      resize: vertical;
+      background: var(--input-bg);
+      color: var(--text-primary);
+      box-sizing: border-box;
+      transition: all 0.3s ease;
+      min-height: 120px;
+    }
+
+    textarea.text-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .text-receive-area {
+      background: #f0fdf4;
+      border: 2px solid #86efac;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    body.dark-mode .text-receive-area {
+      background: #052e16;
+      border-color: #166534;
     }
 
     .upload-area {
@@ -1376,6 +1419,7 @@ function getHTML(env) {
     <div class="mode-selector">
       <button class="mode-btn active" id="sendModeBtn">📤 Send File</button>
       <button class="mode-btn" id="urlModeBtn">🔗 Send URL</button>
+      <button class="mode-btn" id="textModeBtn">📋 Send Text</button>
       <button class="mode-btn" id="receiveModeBtn">📥 Receive</button>
     </div>
     
@@ -1412,6 +1456,17 @@ function getHTML(env) {
       </p>
     </div>
     
+    <!-- Text Mode -->
+    <div class="section" id="textSection">
+      <p style="margin-bottom: 10px; color: var(--text-secondary); font-size: 14px;">Paste or type text to share:</p>
+      <textarea class="text-input" id="textInput" placeholder="Paste your text here (env vars, snippets, notes...)"></textarea>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button id="pasteTextBtn" class="paste-btn" style="flex: 1;">📋 Paste</button>
+        <button id="clearTextBtn" class="paste-btn" style="flex: 1;">✕ Clear</button>
+      </div>
+      <button class="btn" id="sendTextBtn" disabled style="margin-top: 10px;">Waiting for receiver...</button>
+    </div>
+
     <!-- Receive Mode -->
     <div class="section" id="receiveSection">
       <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter the 6-digit code from sender:</p>
@@ -1431,7 +1486,14 @@ function getHTML(env) {
       <div style="font-weight: 600; margin-bottom: 5px;" id="downloadFileName"></div>
       <a href="#" class="download-btn" id="downloadBtn" download>Download File</a>
     </div>
-    
+
+    <div class="text-receive-area" id="textReceiveArea" style="display:none;">
+      <div style="font-size: 32px; margin-bottom: 8px;">📋</div>
+      <div style="font-weight: 600; margin-bottom: 10px; color: var(--text-primary);">Text Received!</div>
+      <textarea class="text-input" id="receivedTextDisplay" readonly style="text-align:left;"></textarea>
+      <button id="copyReceivedTextBtn" class="download-btn" style="border:none; cursor:pointer; margin-top: 10px;">📋 Copy to Clipboard</button>
+    </div>
+
     <div class="error" id="error"></div>
   </div>
 
@@ -1549,9 +1611,11 @@ function getHTML(env) {
     const cookieBannerClose = document.getElementById('cookieBannerClose');
     const sendModeBtn = document.getElementById('sendModeBtn');
     const urlModeBtn = document.getElementById('urlModeBtn');
+    const textModeBtn = document.getElementById('textModeBtn');
     const receiveModeBtn = document.getElementById('receiveModeBtn');
     const sendSection = document.getElementById('sendSection');
     const urlSection = document.getElementById('urlSection');
+    const textSection = document.getElementById('textSection');
     const receiveSection = document.getElementById('receiveSection');
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
@@ -1562,6 +1626,13 @@ function getHTML(env) {
     const urlInput = document.getElementById('urlInput');
     const pasteUrlBtn = document.getElementById('pasteUrlBtn');
     const sendUrlBtn = document.getElementById('sendUrlBtn');
+    const textInput = document.getElementById('textInput');
+    const pasteTextBtn = document.getElementById('pasteTextBtn');
+    const clearTextBtn = document.getElementById('clearTextBtn');
+    const sendTextBtn = document.getElementById('sendTextBtn');
+    const textReceiveArea = document.getElementById('textReceiveArea');
+    const receivedTextDisplay = document.getElementById('receivedTextDisplay');
+    const copyReceivedTextBtn = document.getElementById('copyReceivedTextBtn');
     const roomInput = document.getElementById('roomInput');
     const joinBtn = document.getElementById('joinBtn');
     const progress = document.getElementById('progress');
@@ -1920,6 +1991,11 @@ function getHTML(env) {
           handleUrlFallback(data);
           break;
 
+        case 'text-fallback':
+          // Receiver got plain text via cloud relay
+          handleTextFallback(data);
+          break;
+
         case 'peer-left':
           updateStatusBadge('waiting', 'Waiting for peer...');
           statusText.textContent = 'Peer disconnected';
@@ -2068,9 +2144,14 @@ function getHTML(env) {
             sendUrlBtn.disabled = false;
             sendUrlBtn.textContent = 'Send URL (P2P)';
           }
+
+          if (textInput.value.trim()) {
+            sendTextBtn.disabled = false;
+            sendTextBtn.textContent = 'Send Text (P2P)';
+          }
         }
       };
-      
+
       dataChannel.onmessage = (event) => {
         if (typeof event.data === 'string') {
           const data = JSON.parse(event.data);
@@ -2079,11 +2160,17 @@ function getHTML(env) {
           if (data.type === 'url') {
             statusText.textContent = '🔗 Received URL!';
             showToast('Redirecting to URL...');
-            
+
             // Wait a moment then redirect
             setTimeout(() => {
               window.location.href = data.url;
             }, 1000);
+            return;
+          }
+
+          // Handle text message
+          if (data.type === 'text') {
+            showReceivedText(data.content);
             return;
           }
           
@@ -2136,6 +2223,11 @@ function getHTML(env) {
         if (urlInput.value.trim()) {
           sendUrlBtn.disabled = false;
           sendUrlBtn.textContent = 'Send URL (via Cloud)';
+        }
+
+        if (textInput.value.trim()) {
+          sendTextBtn.disabled = false;
+          sendTextBtn.textContent = 'Send Text (via Cloud)';
         }
       }
     }
@@ -2304,6 +2396,51 @@ function getHTML(env) {
       setTimeout(() => {
         window.location.href = data.redirectUrl;
       }, 1000);
+    }
+
+    function handleTextFallback(data) {
+      showReceivedText(data.content);
+      statusText.textContent = '📋 Text received via Cloud!';
+      showToast('Text received!');
+    }
+
+    function showReceivedText(content) {
+      textReceiveArea.style.display = 'block';
+      receivedTextDisplay.value = content;
+      statusText.textContent = '📋 Text received!';
+      showToast('Text received — tap to copy!');
+    }
+
+    async function sendText() {
+      const content = textInput.value.trim();
+      if (!content) {
+        showError('Please enter some text');
+        return;
+      }
+
+      sendTextBtn.disabled = true;
+
+      if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+        dataChannel.send(JSON.stringify({ type: 'text', content }));
+        statusText.textContent = '✅ Text sent via P2P!';
+        showToast('Text sent!');
+        setTimeout(() => {
+          sendTextBtn.disabled = false;
+          textInput.value = '';
+        }, 2000);
+      } else if (ws && ws.readyState === WebSocket.OPEN) {
+        // Send directly via signaling relay — text is tiny, no R2 needed
+        ws.send(JSON.stringify({ type: 'text-fallback', content }));
+        statusText.textContent = '✅ Text sent via Cloud!';
+        showToast('Text sent!');
+        setTimeout(() => {
+          sendTextBtn.disabled = false;
+          textInput.value = '';
+        }, 2000);
+      } else {
+        showError('Not connected. Please wait for a peer to join.');
+        sendTextBtn.disabled = false;
+      }
     }
 
     function downloadReceivedFile() {
@@ -2505,28 +2642,46 @@ function getHTML(env) {
     sendModeBtn.addEventListener('click', () => {
       sendModeBtn.classList.add('active');
       urlModeBtn.classList.remove('active');
+      textModeBtn.classList.remove('active');
       receiveModeBtn.classList.remove('active');
       sendSection.classList.add('active');
       urlSection.classList.remove('active');
+      textSection.classList.remove('active');
       receiveSection.classList.remove('active');
     });
 
     urlModeBtn.addEventListener('click', () => {
       urlModeBtn.classList.add('active');
       sendModeBtn.classList.remove('active');
+      textModeBtn.classList.remove('active');
       receiveModeBtn.classList.remove('active');
       urlSection.classList.add('active');
       sendSection.classList.remove('active');
+      textSection.classList.remove('active');
       receiveSection.classList.remove('active');
+    });
+
+    textModeBtn.addEventListener('click', () => {
+      textModeBtn.classList.add('active');
+      sendModeBtn.classList.remove('active');
+      urlModeBtn.classList.remove('active');
+      receiveModeBtn.classList.remove('active');
+      textSection.classList.add('active');
+      sendSection.classList.remove('active');
+      urlSection.classList.remove('active');
+      receiveSection.classList.remove('active');
+      textInput.focus();
     });
 
     receiveModeBtn.addEventListener('click', () => {
       receiveModeBtn.classList.add('active');
       sendModeBtn.classList.remove('active');
       urlModeBtn.classList.remove('active');
+      textModeBtn.classList.remove('active');
       receiveSection.classList.add('active');
       sendSection.classList.remove('active');
       urlSection.classList.remove('active');
+      textSection.classList.remove('active');
       roomInput.focus();
     });
     
@@ -2675,7 +2830,57 @@ function getHTML(env) {
     pasteUrlBtn.addEventListener('click', pasteURLFromClipboard);
 
     sendUrlBtn.addEventListener('click', sendUrl);
-    
+
+    // Text mode listeners
+    textInput.addEventListener('input', () => {
+      const hasContent = textInput.value.trim().length > 0;
+      if (!hasContent) {
+        sendTextBtn.disabled = true;
+        return;
+      }
+      if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+        sendTextBtn.disabled = false;
+        sendTextBtn.textContent = 'Send Text (P2P)';
+      } else if (ws && ws.readyState === WebSocket.OPEN) {
+        sendTextBtn.disabled = false;
+        sendTextBtn.textContent = 'Send Text (via Cloud)';
+      }
+    });
+
+    pasteTextBtn.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text) {
+          showError('Clipboard is empty.');
+          return;
+        }
+        textInput.value = text;
+        textInput.dispatchEvent(new Event('input'));
+        showToast('Pasted from clipboard!');
+      } catch (e) {
+        showError('Could not access clipboard. Please paste manually (Ctrl+V / Cmd+V).');
+      }
+    });
+
+    clearTextBtn.addEventListener('click', () => {
+      textInput.value = '';
+      sendTextBtn.disabled = true;
+    });
+
+    copyReceivedTextBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(receivedTextDisplay.value);
+        copyReceivedTextBtn.textContent = '✅ Copied!';
+        showToast('Copied to clipboard!');
+        setTimeout(() => { copyReceivedTextBtn.textContent = '📋 Copy to Clipboard'; }, 2000);
+      } catch (e) {
+        receivedTextDisplay.select();
+        showToast('Press Ctrl+C / Cmd+C to copy');
+      }
+    });
+
+    sendTextBtn.addEventListener('click', sendText);
+
     joinBtn.addEventListener('click', () => {
       const code = roomInput.value.trim().replace(/\D/g, '');
       if (code.length !== 6) {
