@@ -2031,7 +2031,6 @@ function getHTML(env) {
         console.log('Connection state:', pc.connectionState);
         
         if (pc.connectionState === 'connected') {
-          peerInfo.textContent = '✅ P2P connection established!';
           isP2PConnected = true;
           if (p2pTimeout) clearTimeout(p2pTimeout);
         } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
