@@ -41,6 +41,25 @@ export default {
       });
     }
 
+    // TURN credentials endpoint — reads secret, never exposes it in source
+    if (url.pathname === '/api/turn-credentials') {
+      if (!env.METERED_TURN_CREDENTIALS) {
+        return new Response(JSON.stringify([]), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      try {
+        const creds = JSON.parse(env.METERED_TURN_CREDENTIALS);
+        return new Response(JSON.stringify(creds), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch {
+        return new Response(JSON.stringify([]), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // Serve the UI
     if (url.pathname === '/' || url.pathname === '/index.html') {
       return new Response(getHTML(env), {
@@ -1487,6 +1506,16 @@ function getHTML(env) {
       chunkSize: 16384, // 16KB chunks
       maxFileSize: 20 * 1024 * 1024 // 20MB limit for R2 fallback
     };
+
+    // Fetch TURN credentials from worker (secret never touches client source)
+    fetch('/api/turn-credentials')
+      .then(r => r.json())
+      .then(turnServers => {
+        if (Array.isArray(turnServers) && turnServers.length > 0) {
+          CONFIG.iceServers = CONFIG.iceServers.concat(turnServers);
+        }
+      })
+      .catch(() => {}); // silently ignore — STUN-only fallback still works
     
     // State
     let ws = null;
