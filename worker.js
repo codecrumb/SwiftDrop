@@ -72,15 +72,22 @@ export default {
     
     // WebSocket upgrade for signaling
     if (url.pathname === '/ws') {
+      // Validate Origin to prevent Cross-Site WebSocket Hijacking (CSWSH).
+      // Browsers always send an Origin header on WebSocket handshakes; a missing
+      // or unlisted Origin from a browser context indicates a cross-site attempt.
+      if (!isAllowedWebSocketOrigin(request, env)) {
+        return new Response('Forbidden: origin not allowed', { status: 403 });
+      }
+
       const roomCode = url.searchParams.get('room');
       if (!roomCode || roomCode.length !== 6) {
         return new Response('Invalid room code', { status: 400 });
       }
-      
+
       // Get or create Durable Object for this room
       const id = env.ROOMS.idFromName(roomCode.toUpperCase());
       const room = env.ROOMS.get(id);
-      
+
       // Forward WebSocket connection to the Durable Object
       return room.fetch(request);
     }
@@ -391,6 +398,42 @@ function getCorsHeaders(request, env) {
 
   // No CORS headers if origin not allowed (will block cross-origin requests)
   return {};
+}
+
+/**
+ * Decide whether a WebSocket upgrade request comes from an allowed Origin.
+ *
+ * This blocks Cross-Site WebSocket Hijacking (CSWSH): the same-origin policy
+ * does not apply to WebSocket handshakes, so any site a victim visits could
+ * otherwise open a WS to our worker and speak as that user.
+ *
+ * Rules:
+ *  - If ALLOWED_ORIGINS is configured, the Origin header MUST be present and
+ *    MUST match one of the configured origins.
+ *  - If ALLOWED_ORIGINS is not configured, allow the request but match the
+ *    worker's origin (same-origin) when an Origin header is present. Requests
+ *    without an Origin header (non-browser clients) are allowed in this mode
+ *    to preserve current behavior for local/dev setups.
+ */
+function isAllowedWebSocketOrigin(request, env) {
+  const origin = request.headers.get('Origin');
+  const allowedOrigins = (env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
+  if (allowedOrigins.length > 0) {
+    return Boolean(origin) && allowedOrigins.includes(origin);
+  }
+
+  // No explicit allowlist configured: fall back to same-origin check.
+  if (!origin) return true;
+  try {
+    const requestOrigin = new URL(request.url).origin;
+    return origin === requestOrigin;
+  } catch {
+    return false;
+  }
 }
 
 /**
