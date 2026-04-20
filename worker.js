@@ -1663,13 +1663,16 @@ function getHTML(env) {
       color: #c4b5fd;
     }
 
+    /* Inline QR wrapper — always hidden on mobile */
+    .qr-inline-wrapper { display: none; }
+
     /* ── Desktop two-column layout ── */
     @media (min-width: 768px) {
       .container {
-        max-width: 880px;
+        max-width: 920px;
         padding: 0;
         display: grid;
-        grid-template-columns: 260px 1fr;
+        grid-template-columns: 300px 1fr;
         overflow: hidden;
         align-items: stretch;
       }
@@ -1702,7 +1705,48 @@ function getHTML(env) {
       .left-panel .status {
         width: 100%;
         margin-bottom: 0;
-        margin-top: auto;
+        margin-top: 28px;
+      }
+
+      .left-panel .room-code {
+        font-size: 38px;
+        letter-spacing: 6px;
+      }
+
+      .qr-inline-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        margin-top: 20px;
+        gap: 14px;
+      }
+
+      #qrInlineCode {
+        padding: 12px;
+        background: white;
+        border-radius: 12px;
+        border: 2px solid var(--border-color);
+        display: inline-block;
+        line-height: 0;
+      }
+
+      .copy-link-btn {
+        width: 100%;
+        padding: 10px 16px;
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        border: 1.5px solid #667eea;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .copy-link-btn:hover {
+        background: #667eea;
+        color: white;
       }
 
       .right-panel {
@@ -1733,6 +1777,12 @@ function getHTML(env) {
           <span class="status-icon">⏳</span>
           <span class="status-text">Waiting for peer...</span>
         </div>
+      </div>
+
+      <!-- Inline QR + copy link (desktop sender only) -->
+      <div class="qr-inline-wrapper" id="qrInlineWrapper" style="display:none;">
+        <div id="qrInlineCode"></div>
+        <button class="copy-link-btn" id="copyLinkBtn">🔗 Copy Link</button>
       </div>
     </div>
 
@@ -1934,6 +1984,9 @@ function getHTML(env) {
     const qrModalClose = document.getElementById('qrModalClose');
     const modalRoomCode = document.getElementById('modalRoomCode');
     const qrcodeDiv = document.getElementById('qrcode');
+    const qrInlineWrapper = document.getElementById('qrInlineWrapper');
+    const qrInlineCodeEl = document.getElementById('qrInlineCode');
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
     const cookieBanner = document.getElementById('cookieBanner');
     const cookieBannerClose = document.getElementById('cookieBannerClose');
     const sendRoleBtn = document.getElementById('sendRoleBtn');
@@ -2133,15 +2186,14 @@ function getHTML(env) {
       }
     }
 
-    // Helper function to generate QR code in modal
+    // Helper function to generate QR code in modal + inline panel
     function generateQRCode(roomCode) {
-      // Clear existing QR code
       qrcodeDiv.innerHTML = '';
+      qrInlineCodeEl.innerHTML = '';
 
-      // Generate full URL with room parameter
       const fullUrl = window.location.origin + window.location.pathname + '?room=' + roomCode;
 
-      // Create QR code
+      // Modal QR
       new QRCode(qrcodeDiv, {
         text: fullUrl,
         width: 220,
@@ -2150,6 +2202,19 @@ function getHTML(env) {
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
       });
+
+      // Inline panel QR (desktop only, but harmless to generate on mobile)
+      new QRCode(qrInlineCodeEl, {
+        text: fullUrl,
+        width: 180,
+        height: 180,
+        colorDark: '#667eea',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      // Show inline wrapper (CSS hides it on mobile)
+      qrInlineWrapper.style.display = '';
     }
 
     // Open QR modal
@@ -3040,6 +3105,11 @@ function getHTML(env) {
     // QR Modal - Close button
     qrModalClose.addEventListener('click', closeQRModal);
 
+    copyLinkBtn.addEventListener('click', () => {
+      const url = window.location.origin + window.location.pathname + '?room=' + roomCode;
+      navigator.clipboard.writeText(url).then(() => showToast('Link copied!')).catch(() => showToast('Copy failed'));
+    });
+
     // QR Modal - Click outside to close
     qrModal.addEventListener('click', (e) => {
       if (e.target === qrModal) {
@@ -3062,6 +3132,7 @@ function getHTML(env) {
       sendTypeSelector.style.display = '';
       receiveSection.classList.remove('active');
       roleHint.textContent = 'Share your room code with the other device';
+      if (qrInlineCodeEl.innerHTML) qrInlineWrapper.style.display = '';
     }
 
     sendRoleBtn.addEventListener('click', () => {
@@ -3077,6 +3148,7 @@ function getHTML(env) {
       urlSection.classList.remove('active');
       textSection.classList.remove('active');
       roleHint.textContent = 'Enter the code shown on the other device';
+      qrInlineWrapper.style.display = 'none';
       roomInput.focus();
     });
 
