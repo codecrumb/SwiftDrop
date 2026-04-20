@@ -1791,7 +1791,7 @@ function getHTML(env) {
 
       .right-panel {
         padding: 36px 32px 40px;
-        min-height: 420px;
+        min-height: 500px;
       }
 
       .right-panel .upload-area {
@@ -1816,9 +1816,8 @@ function getHTML(env) {
 
       .dark-mode-toggle {
         position: static;
-        margin-top: auto;
+        margin-top: 24px;
         align-self: center;
-        margin-bottom: 4px;
       }
 
     }
@@ -2283,8 +2282,8 @@ function getHTML(env) {
       // Inline panel QR (desktop only, but harmless to generate on mobile)
       new QRCode(qrInlineCodeEl, {
         text: fullUrl,
-        width: 180,
-        height: 180,
+        width: 148,
+        height: 148,
         colorDark: '#667eea',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
