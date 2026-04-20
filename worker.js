@@ -1608,17 +1608,17 @@ function getHTML(env) {
     .cookie-banner {
       position: fixed;
       bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
+      right: 20px;
+      background: var(--container-bg);
       border-radius: 12px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
       padding: 20px 24px;
-      max-width: 500px;
-      width: 90%;
+      max-width: 320px;
+      width: calc(100% - 40px);
       z-index: 3000;
       display: none;
-      border: 2px solid #e5e7eb;
+      border: 2px solid var(--border-color);
+      transition: background 0.3s ease, border-color 0.3s ease;
     }
 
     .cookie-banner.show {
@@ -1628,11 +1628,11 @@ function getHTML(env) {
 
     @keyframes slideUp {
       from {
-        transform: translateX(-50%) translateY(100px);
+        transform: translateY(100px);
         opacity: 0;
       }
       to {
-        transform: translateX(-50%) translateY(0);
+        transform: translateY(0);
         opacity: 1;
       }
     }
@@ -1654,13 +1654,13 @@ function getHTML(env) {
 
     .cookie-banner-title {
       font-weight: 700;
-      color: #333;
+      color: var(--text-primary);
       margin-bottom: 5px;
       font-size: 15px;
     }
 
     .cookie-banner-message {
-      color: #666;
+      color: var(--text-secondary);
       font-size: 13px;
       line-height: 1.5;
     }
