@@ -1663,8 +1663,8 @@ function getHTML(env) {
       color: #c4b5fd;
     }
 
-    /* Inline QR wrapper — always hidden on mobile */
-    .qr-inline-wrapper { display: none; }
+    /* Inline QR wrapper and receive state — always hidden on mobile */
+    .qr-inline-wrapper, .left-receive-state { display: none; }
 
     /* ── Desktop two-column layout ── */
     @media (min-width: 768px) {
@@ -1749,6 +1749,33 @@ function getHTML(env) {
         color: white;
       }
 
+      .left-receive-state {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        text-align: center;
+        padding: 24px 0;
+      }
+
+      .left-receive-icon {
+        font-size: 56px;
+        line-height: 1;
+      }
+
+      .left-receive-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .left-receive-sub {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+
       .right-panel {
         padding: 36px 32px 40px;
         position: relative;
@@ -1783,6 +1810,13 @@ function getHTML(env) {
       <div class="qr-inline-wrapper" id="qrInlineWrapper" style="display:none;">
         <div id="qrInlineCode"></div>
         <button class="copy-link-btn" id="copyLinkBtn">🔗 Copy Link</button>
+      </div>
+
+      <!-- Receive mode state (desktop only) -->
+      <div class="left-receive-state" id="leftReceiveState" style="display:none;">
+        <div class="left-receive-icon">📡</div>
+        <div class="left-receive-title">Ready to Receive</div>
+        <div class="left-receive-sub">Enter the code from the sender's screen</div>
       </div>
     </div>
 
@@ -1987,6 +2021,7 @@ function getHTML(env) {
     const qrInlineWrapper = document.getElementById('qrInlineWrapper');
     const qrInlineCodeEl = document.getElementById('qrInlineCode');
     const copyLinkBtn = document.getElementById('copyLinkBtn');
+    const leftReceiveState = document.getElementById('leftReceiveState');
     const cookieBanner = document.getElementById('cookieBanner');
     const cookieBannerClose = document.getElementById('cookieBannerClose');
     const sendRoleBtn = document.getElementById('sendRoleBtn');
@@ -3132,7 +3167,9 @@ function getHTML(env) {
       sendTypeSelector.style.display = '';
       receiveSection.classList.remove('active');
       roleHint.textContent = 'Share your room code with the other device';
+      status.style.display = '';
       if (qrInlineCodeEl.innerHTML) qrInlineWrapper.style.display = '';
+      leftReceiveState.style.display = 'none';
     }
 
     sendRoleBtn.addEventListener('click', () => {
@@ -3148,7 +3185,9 @@ function getHTML(env) {
       urlSection.classList.remove('active');
       textSection.classList.remove('active');
       roleHint.textContent = 'Enter the code shown on the other device';
+      status.style.display = 'none';
       qrInlineWrapper.style.display = 'none';
+      leftReceiveState.style.display = '';
       roomInput.focus();
     });
 
