@@ -1683,6 +1683,30 @@ function getHTML(env) {
       transform: translateY(-1px);
     }
 
+    /* TeleHost promo */
+    .telehost-promo {
+      display: none;
+      margin-top: 16px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--file-info-bg);
+      border: 1px solid var(--border-color);
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-secondary);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .telehost-promo a {
+      color: #667eea;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .telehost-promo a:hover {
+      text-decoration: underline;
+    }
+
     /* Full-page drag overlay */
     #dragOverlay {
       display: none;
@@ -1989,6 +2013,10 @@ function getHTML(env) {
       <button id="copyReceivedTextBtn" class="download-btn" style="border:none; cursor:pointer; margin-top: 10px;">📋 Copy to Clipboard</button>
     </div>
 
+    <div class="telehost-promo" id="telehostPromo">
+      Need permanent file hosting? Try <a href="https://telehost.pages.dev" target="_blank" rel="noopener">TeleHost</a> — free &amp; forever.
+    </div>
+
     <div class="error" id="error"></div>
     </div><!-- /right-panel -->
   </div>
@@ -2156,6 +2184,7 @@ function getHTML(env) {
     const downloadBtn = document.getElementById('downloadBtn');
     const errorDiv = document.getElementById('error');
     const toast = document.getElementById('toast');
+    const telehostPromo = document.getElementById('telehostPromo');
     
     // Initialize
     init();
@@ -2881,6 +2910,7 @@ function getHTML(env) {
         } else {
           progressText.textContent = '✅ Transfer complete!';
           showToast('File sent successfully!');
+          telehostPromo.style.display = 'block';
           setTimeout(() => {
             progress.style.display = 'none';
             sendBtn.disabled = false;
@@ -3020,6 +3050,7 @@ function getHTML(env) {
       receivedTextDisplay.value = content;
       statusText.textContent = '📋 Text received!';
       showToast('Text received — tap to copy!');
+      telehostPromo.style.display = 'block';
     }
 
     async function sendText() {
@@ -3066,6 +3097,7 @@ function getHTML(env) {
       progress.style.display = 'none';
       statusText.textContent = '✅ File downloaded!';
       showToast('File downloaded successfully!');
+      telehostPromo.style.display = 'block';
       
       receivedChunks = [];
       receivedSize = 0;
