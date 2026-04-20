@@ -2306,8 +2306,13 @@ function getHTML(env) {
       document.querySelector('.role-selector').style.display = '';
       roleHint.style.display = '';
       sendTypeSelector.style.display = '';
-      // Let the role buttons restore the correct section
-      receiveRoleBtn.click();
+      // Clear inline styles set by showReceiveSuccess so CSS classes take over
+      sendSection.style.display = '';
+      urlSection.style.display = '';
+      textSection.style.display = '';
+      receiveSection.style.display = '';
+      progress.style.display = '';
+      sendRoleBtn.click();
     });
 
     // Copy button in success panel
@@ -3483,6 +3488,7 @@ function getHTML(env) {
         dragCounter++;
         if (receiveSuccessPanel.classList.contains('active')) {
           successResetBtn.click();
+          sendRoleBtn.click();
         }
         dragOverlay.classList.add('active');
       }
