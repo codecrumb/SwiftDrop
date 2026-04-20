@@ -1269,9 +1269,9 @@ function getHTML(env) {
 
     /* Button state variations */
     .btn-waiting:disabled {
-      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-      color: #1c1410;
-      opacity: 1;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      opacity: 0.5;
       cursor: not-allowed;
       animation: pulse-waiting 2s ease-in-out infinite;
     }
