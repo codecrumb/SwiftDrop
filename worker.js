@@ -1880,22 +1880,28 @@ function getHTML(env) {
         line-height: 0;
       }
 
-      .copy-link-btn {
-        width: 100%;
-        padding: 10px 16px;
-        background: rgba(102, 126, 234, 0.1);
-        color: #667eea;
-        border: 1.5px solid #667eea;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
+      .qr-inline-wrapper {
+        position: relative;
         cursor: pointer;
-        transition: all 0.2s;
+        margin-top: 16px;
       }
 
-      .copy-link-btn:hover {
-        background: #667eea;
-        color: white;
+      .qr-inline-wrapper::after {
+        content: '👆 Click to copy link';
+        position: absolute;
+        bottom: -22px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+        color: #9ca3af;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+
+      .qr-inline-wrapper:hover::after {
+        opacity: 1;
       }
 
       .left-receive-state {
@@ -1984,7 +1990,6 @@ function getHTML(env) {
       <!-- Inline QR + copy link (desktop sender only) -->
       <div class="qr-inline-wrapper" id="qrInlineWrapper" style="display:none;">
         <div id="qrInlineCode"></div>
-        <button class="copy-link-btn" id="copyLinkBtn">🔗 Copy Link</button>
       </div>
 
       <!-- Receive mode state (desktop only) -->
@@ -2218,7 +2223,6 @@ function getHTML(env) {
     const qrcodeDiv = document.getElementById('qrcode');
     const qrInlineWrapper = document.getElementById('qrInlineWrapper');
     const qrInlineCodeEl = document.getElementById('qrInlineCode');
-    const copyLinkBtn = document.getElementById('copyLinkBtn');
     const leftReceiveState = document.getElementById('leftReceiveState');
     const cookieBanner = document.getElementById('cookieBanner');
     const cookieBannerClose = document.getElementById('cookieBannerClose');
@@ -3391,7 +3395,7 @@ function getHTML(env) {
     // QR Modal - Close button
     qrModalClose.addEventListener('click', closeQRModal);
 
-    copyLinkBtn.addEventListener('click', () => {
+    qrInlineWrapper.addEventListener('click', () => {
       const url = window.location.origin + window.location.pathname + '?room=' + roomCode;
       navigator.clipboard.writeText(url).then(() => showToast('Link copied!')).catch(() => showToast('Copy failed'));
     });
