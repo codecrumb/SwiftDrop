@@ -1268,6 +1268,19 @@ function getHTML(env) {
     }
 
     /* Button state variations */
+    .btn-waiting:disabled {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #1c1410;
+      opacity: 1;
+      cursor: not-allowed;
+      animation: pulse-waiting 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-waiting {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
     .btn-gray {
       background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
       opacity: 0.7;
@@ -1778,7 +1791,7 @@ function getHTML(env) {
 
       .right-panel {
         padding: 36px 32px 40px;
-        position: relative;
+        min-height: 420px;
       }
 
       .right-panel .upload-area {
@@ -1787,6 +1800,25 @@ function getHTML(env) {
 
       .right-panel .upload-icon {
         font-size: 64px;
+      }
+
+      #roomInput {
+        font-size: 28px;
+        padding: 16px;
+        letter-spacing: 8px;
+        border-width: 2.5px;
+      }
+
+      #roomInput:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+      }
+
+      .dark-mode-toggle {
+        position: static;
+        margin-top: auto;
+        align-self: center;
+        margin-bottom: 4px;
       }
 
     }
@@ -1826,10 +1858,11 @@ function getHTML(env) {
         <div class="left-receive-title">Ready to Receive</div>
         <div class="left-receive-sub">Enter the code from the sender's screen</div>
       </div>
+
+      <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode">🌙</button>
     </div>
 
     <div class="right-panel">
-    <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode">🌙</button>
     <div class="role-selector">
       <button class="role-btn active" id="sendRoleBtn">📤 Send</button>
       <button class="role-btn" id="receiveRoleBtn">📥 Receive</button>
@@ -1855,7 +1888,7 @@ function getHTML(env) {
         <div class="file-size" id="fileSize"></div>
       </div>
       
-      <button class="btn" id="sendBtn" disabled>Waiting for receiver...</button>
+      <button class="btn btn-waiting" id="sendBtn" disabled>Waiting for receiver...</button>
     </div>
     
     <!-- URL Mode -->
@@ -1868,7 +1901,7 @@ function getHTML(env) {
           📋 Paste
         </button>
       </div>
-      <button class="btn" id="sendUrlBtn" disabled>Waiting for receiver...</button>
+      <button class="btn btn-waiting" id="sendUrlBtn" disabled>Waiting for receiver...</button>
       <p style="margin-top: 10px; font-size: 12px; color: #999; text-align: center;">
         Receiver will be redirected to this URL
       </p>
@@ -1882,7 +1915,7 @@ function getHTML(env) {
         <button id="pasteTextBtn" class="paste-btn" style="flex: 1;">📋 Paste</button>
         <button id="clearTextBtn" class="paste-btn" style="flex: 1;">✕ Clear</button>
       </div>
-      <button class="btn" id="sendTextBtn" disabled style="margin-top: 10px;">Waiting for receiver...</button>
+      <button class="btn btn-waiting" id="sendTextBtn" disabled style="margin-top: 10px;">Waiting for receiver...</button>
     </div>
 
     <!-- Receive Mode -->
@@ -2205,6 +2238,7 @@ function getHTML(env) {
 
       switch(state) {
         case 'waiting':
+          sendBtn.classList.add('btn-waiting');
           sendBtn.disabled = true;
           sendBtn.textContent = 'Waiting for receiver...';
           break;
