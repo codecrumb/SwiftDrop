@@ -69,7 +69,42 @@ export default {
         }
       });
     }
-    
+
+    // PWA manifest (Android Web Share Target needs same-origin manifest + SW)
+    if (url.pathname === '/manifest.webmanifest' && request.method === 'GET') {
+      return new Response(getManifest(), {
+        headers: {
+          'Content-Type': 'application/manifest+json;charset=UTF-8',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
+    }
+
+    // Service worker (must be served from same origin with scope /)
+    if (url.pathname === '/sw.js' && request.method === 'GET') {
+      return new Response(getServiceWorker(), {
+        headers: {
+          'Content-Type': 'application/javascript;charset=UTF-8',
+          // Browsers require a short-lived SW response so updates are picked up
+          'Cache-Control': 'no-cache',
+          'Service-Worker-Allowed': '/'
+        }
+      });
+    }
+
+    // Same-origin icon proxy for PWA install + share target
+    if (url.pathname.startsWith('/icons/') && request.method === 'GET') {
+      return serveIcon(url.pathname);
+    }
+
+    // POST /share is only hit when the installed PWA's service worker is NOT yet
+    // controlling the page (e.g. first launch after install). The SW normally
+    // intercepts it and stashes the files in Cache Storage. As a graceful
+    // fallback we redirect to the home page so the user can still send manually.
+    if (url.pathname === '/share' && request.method === 'POST') {
+      return Response.redirect(new URL('/?shared=unavailable', request.url).toString(), 303);
+    }
+
     // WebSocket upgrade for signaling
     if (url.pathname === '/ws') {
       // Validate Origin to prevent Cross-Site WebSocket Hijacking (CSWSH).
@@ -529,6 +564,163 @@ async function cleanupExpiredFiles(env) {
 }
 
 /**
+ * PWA manifest. share_target tells Android to offer SwiftDrop in the system
+ * share sheet; the matching POST is intercepted by sw.js below.
+ */
+function getManifest() {
+  return JSON.stringify({
+    name: 'SwiftDrop',
+    short_name: 'SwiftDrop',
+    description: 'P2P file transfer with cloud fallback',
+    start_url: '/',
+    scope: '/',
+    display: 'standalone',
+    orientation: 'portrait',
+    theme_color: '#667eea',
+    background_color: '#ffffff',
+    icons: [
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+    ],
+    share_target: {
+      action: '/share',
+      method: 'POST',
+      enctype: 'multipart/form-data',
+      params: {
+        title: 'title',
+        text: 'text',
+        url: 'url',
+        files: [
+          { name: 'files', accept: ['*/*'] }
+        ]
+      }
+    }
+  });
+}
+
+/**
+ * Minimal service worker. Its only job is to intercept the share_target POST
+ * to /share, stash the incoming files in Cache Storage, and redirect the
+ * launched window to /?shared=1 which reads them back on load.
+ *
+ * Keep this tiny: it purposefully does NOT cache app shell. SwiftDrop is a
+ * single-page Worker-rendered app and we do not want stale HTML.
+ */
+function getServiceWorker() {
+  return `// SwiftDrop service worker — share_target handler only.
+const SHARE_CACHE = 'swiftdrop-share-v1';
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  if (req.method === 'POST' && url.pathname === '/share') {
+    event.respondWith(handleShare(event));
+    return;
+  }
+  // Everything else: let the network handle it (no app-shell caching).
+});
+
+async function handleShare(event) {
+  const redirect = Response.redirect('/?shared=1', 303);
+  try {
+    const formData = await event.request.formData();
+    const files = formData.getAll('files').filter((f) => f && typeof f === 'object' && 'name' in f && 'size' in f);
+    const title = formData.get('title') || '';
+    const text = formData.get('text') || '';
+    const sharedUrl = formData.get('url') || '';
+
+    const cache = await caches.open(SHARE_CACHE);
+
+    // Clear any previous shared payload so we never surface stale files.
+    const keys = await cache.keys();
+    await Promise.all(keys.map((k) => cache.delete(k)));
+
+    const manifest = {
+      ts: Date.now(),
+      title: String(title),
+      text: String(text),
+      url: String(sharedUrl),
+      files: []
+    };
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const key = '/__shared__/' + i + '/' + encodeURIComponent(f.name || ('file-' + i));
+      await cache.put(
+        new Request(key),
+        new Response(f, {
+          headers: {
+            'Content-Type': f.type || 'application/octet-stream',
+            'X-Shared-Name': encodeURIComponent(f.name || ('file-' + i))
+          }
+        })
+      );
+      manifest.files.push({
+        key,
+        name: f.name || ('file-' + i),
+        type: f.type || 'application/octet-stream',
+        size: typeof f.size === 'number' ? f.size : 0
+      });
+    }
+
+    await cache.put(
+      new Request('/__shared__/manifest.json'),
+      new Response(JSON.stringify(manifest), {
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+
+    return redirect;
+  } catch (err) {
+    return Response.redirect('/?shared=error', 303);
+  }
+}
+`;
+}
+
+/**
+ * Serve same-origin icons. Android's share target + install prompt only
+ * advertise icons listed in the manifest, and Chrome fetches them from the
+ * manifest's origin. We proxy the existing hosted favicons so we don't have
+ * to check binary assets into the repo.
+ */
+async function serveIcon(pathname) {
+  const map = {
+    '/icons/icon-192.png': 'https://faviconser.pages.dev/swiftdrop/icon-192.png',
+    '/icons/icon-512.png': 'https://faviconser.pages.dev/swiftdrop/icon-512.png',
+    '/icons/apple-touch-icon.png': 'https://faviconser.pages.dev/swiftdrop/apple-touch-icon.png',
+    '/icons/favicon-16.png': 'https://faviconser.pages.dev/swiftdrop/favicon-16.png',
+    '/icons/favicon-32.png': 'https://faviconser.pages.dev/swiftdrop/favicon-32.png',
+    '/icons/favicon.ico': 'https://faviconser.pages.dev/swiftdrop/favicon.ico'
+  };
+  const upstream = map[pathname];
+  if (!upstream) return new Response('Not Found', { status: 404 });
+
+  const upstreamRes = await fetch(upstream, {
+    cf: { cacheTtl: 86400, cacheEverything: true }
+  });
+  if (!upstreamRes.ok) {
+    return new Response('Icon fetch failed', { status: 502 });
+  }
+
+  const headers = new Headers();
+  const ct = upstreamRes.headers.get('Content-Type');
+  if (ct) headers.set('Content-Type', ct);
+  headers.set('Cache-Control', 'public, max-age=86400, immutable');
+  return new Response(upstreamRes.body, { status: 200, headers });
+}
+
+/**
  * Durable Object: SignalingRoom
  * Manages WebSocket connections and WebRTC signaling for a room
  */
@@ -713,7 +905,9 @@ function getHTML(env) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#667eea">
   <title>SwiftDrop - P2P File Transfer</title>
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="https://faviconser.pages.dev/swiftdrop/favicon.ico">
   <link rel="icon" type="image/png" sizes="16x16" href="https://faviconser.pages.dev/swiftdrop/favicon-16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="https://faviconser.pages.dev/swiftdrop/favicon-32.png">
@@ -1689,6 +1883,91 @@ function getHTML(env) {
     
     // Initialize
     init();
+
+    // --- PWA: register service worker + handle share_target payload -----
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch((err) => {
+          console.warn('[PWA] SW registration failed', err);
+        });
+      });
+    }
+
+    async function loadSharedPayload() {
+      const params = new URLSearchParams(window.location.search);
+      const shared = params.get('shared');
+      if (!shared) return;
+
+      // Strip the ?shared param so a manual refresh doesn't re-trigger this.
+      const cleaned = window.location.pathname +
+        (params.get('room') ? ('?room=' + params.get('room')) : '') +
+        window.location.hash;
+      history.replaceState(null, '', cleaned);
+
+      if (shared === 'error' || shared === 'unavailable') {
+        showError('Could not receive shared content. Please reload the app from your home screen and try again.');
+        return;
+      }
+      if (!('caches' in window)) return;
+
+      try {
+        const cache = await caches.open('swiftdrop-share-v1');
+        const manifestRes = await cache.match('/__shared__/manifest.json');
+        if (!manifestRes) return;
+        const manifest = await manifestRes.json();
+
+        if (manifest.files && manifest.files.length > 0) {
+          const meta = manifest.files[0];
+          const fileRes = await cache.match(meta.key);
+          if (fileRes) {
+            const blob = await fileRes.blob();
+            const file = new File([blob], meta.name, { type: meta.type || blob.type || 'application/octet-stream' });
+
+            sendModeBtn.click();
+            try {
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              fileInput.files = dt.files;
+            } catch (_) { /* DataTransfer not supported on some UA — selectedFile is still set */ }
+            selectedFile = file;
+            fileNameEl.textContent = file.name;
+            fileSizeEl.textContent = formatFileSize(file.size);
+            fileInfo.style.display = 'block';
+
+            if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+              updateSendButton('p2p');
+            } else if (ws && ws.readyState === WebSocket.OPEN) {
+              updateSendButton('connecting');
+            } else {
+              updateSendButton('waiting');
+            }
+
+            showToast('Shared: ' + file.name);
+            if (manifest.files.length > 1) {
+              showError('Only the first of ' + manifest.files.length + ' shared files was loaded. Send them one at a time.');
+            }
+          }
+        } else if (manifest.url) {
+          urlModeBtn.click();
+          urlInput.value = manifest.url;
+          urlInput.dispatchEvent(new Event('input'));
+          showToast('Shared URL ready to send');
+        } else if (manifest.text || manifest.title) {
+          textModeBtn.click();
+          textInput.value = [manifest.title, manifest.text].filter(Boolean).join('\\n\\n');
+          textInput.dispatchEvent(new Event('input'));
+          showToast('Shared text ready to send');
+        }
+
+        // Payload consumed — clear the cache so it isn't reused.
+        const keys = await cache.keys();
+        await Promise.all(keys.map((k) => cache.delete(k)));
+      } catch (e) {
+        console.error('[share] failed to load payload', e);
+      }
+    }
+    loadSharedPayload();
+    // --------------------------------------------------------------------
 
     // Helper function to update status badge
     function updateStatusBadge(state, message) {
