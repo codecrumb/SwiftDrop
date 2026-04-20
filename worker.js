@@ -1662,6 +1662,58 @@ function getHTML(env) {
       font-size: 14px;
       color: #c4b5fd;
     }
+
+    /* ── Desktop two-column layout ── */
+    @media (min-width: 768px) {
+      .container {
+        max-width: 880px;
+        padding: 0;
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        overflow: hidden;
+        align-items: stretch;
+      }
+
+      .left-panel {
+        padding: 40px 28px;
+        border-right: 1px solid var(--border-color);
+        background: linear-gradient(160deg, rgba(102,126,234,0.07) 0%, rgba(118,75,162,0.04) 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        transition: background 0.3s ease, border-color 0.3s ease;
+      }
+
+      body.dark-mode .left-panel {
+        background: linear-gradient(160deg, rgba(102,126,234,0.12) 0%, rgba(118,75,162,0.08) 100%);
+      }
+
+      .left-panel h1 {
+        font-size: 26px;
+        margin-bottom: 8px;
+      }
+
+      .left-panel .subtitle {
+        font-size: 12px;
+        margin-bottom: 28px;
+      }
+
+      .left-panel .status {
+        width: 100%;
+        margin-bottom: 0;
+        margin-top: auto;
+      }
+
+      .right-panel {
+        padding: 36px 32px 40px;
+        position: relative;
+      }
+
+      .right-panel .role-selector {
+        padding-right: 52px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1673,19 +1725,22 @@ function getHTML(env) {
   </div>
 
   <div class="container">
-    <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode">🌙</button>
-    <h1>🚀 SwiftDrop</h1>
-    <p class="subtitle">Instant P2P file transfer • Files auto-delete after download</p>
-    
-    <div class="status" id="status">
-      <div id="statusText">Generating room code...</div>
-      <div class="room-code" id="roomCode">------</div>
-      <div class="status-badge badge-waiting" id="statusBadge">
-        <span class="status-icon">⏳</span>
-        <span class="status-text">Waiting for peer...</span>
+    <div class="left-panel">
+      <h1>🚀 SwiftDrop</h1>
+      <p class="subtitle">Instant P2P file transfer • Files auto-delete after download</p>
+
+      <div class="status" id="status">
+        <div id="statusText">Generating room code...</div>
+        <div class="room-code" id="roomCode">------</div>
+        <div class="status-badge badge-waiting" id="statusBadge">
+          <span class="status-icon">⏳</span>
+          <span class="status-text">Waiting for peer...</span>
+        </div>
       </div>
     </div>
 
+    <div class="right-panel">
+    <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode">🌙</button>
     <div class="role-selector">
       <button class="role-btn active" id="sendRoleBtn">📤 Send</button>
       <button class="role-btn" id="receiveRoleBtn">📥 Receive</button>
@@ -1769,6 +1824,7 @@ function getHTML(env) {
     </div>
 
     <div class="error" id="error"></div>
+    </div><!-- /right-panel -->
   </div>
 
   <div class="toast" id="toast"></div>
