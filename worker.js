@@ -1827,7 +1827,7 @@ function getHTML(env) {
       }
 
       .left-panel {
-        padding: 40px 28px;
+        padding: 10px 28px;
         border-right: 1px solid var(--border-color);
         background: linear-gradient(160deg, rgba(102,126,234,0.07) 0%, rgba(118,75,162,0.04) 100%);
         display: flex;
