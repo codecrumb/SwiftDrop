@@ -1710,9 +1710,6 @@ function getHTML(env) {
         position: relative;
       }
 
-      .right-panel .role-selector {
-        padding-right: 52px;
-      }
     }
   </style>
 </head>
