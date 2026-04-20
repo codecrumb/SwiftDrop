@@ -1100,27 +1100,60 @@ function getHTML(env) {
       transition: color 0.3s ease;
     }
 
-    .mode-selector {
+    .role-selector {
       display: flex;
       gap: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
 
-    .mode-btn {
+    .role-btn {
       flex: 1;
-      padding: 12px;
+      padding: 14px 12px;
       border: 2px solid var(--border-color);
       background: var(--container-bg);
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
-      font-weight: 600;
+      font-weight: 700;
+      font-size: 16px;
       color: var(--text-primary);
       transition: all 0.2s;
     }
-    
-    .mode-btn.active {
+
+    .role-btn.active {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
+      border-color: #667eea;
+    }
+
+    .role-hint {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .send-type-selector {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .send-type-btn {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1.5px solid var(--border-color);
+      background: var(--container-bg);
+      border-radius: 7px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .send-type-btn.active {
+      background: rgba(102, 126, 234, 0.12);
+      color: #667eea;
       border-color: #667eea;
     }
     
@@ -1653,11 +1686,15 @@ function getHTML(env) {
       </div>
     </div>
 
-    <div class="mode-selector">
-      <button class="mode-btn active" id="sendModeBtn">📤 Send File</button>
-      <button class="mode-btn" id="urlModeBtn">🔗 Send URL</button>
-      <button class="mode-btn" id="textModeBtn">📋 Send Text</button>
-      <button class="mode-btn" id="receiveModeBtn">📥 Receive</button>
+    <div class="role-selector">
+      <button class="role-btn active" id="sendRoleBtn">📤 Send</button>
+      <button class="role-btn" id="receiveRoleBtn">📥 Receive</button>
+    </div>
+    <p class="role-hint" id="roleHint">Share your room code with the other device</p>
+    <div class="send-type-selector" id="sendTypeSelector">
+      <button class="send-type-btn active" id="sendModeBtn">📁 File</button>
+      <button class="send-type-btn" id="urlModeBtn">🔗 URL</button>
+      <button class="send-type-btn" id="textModeBtn">📋 Text</button>
     </div>
     
     <!-- Send Mode -->
@@ -1846,10 +1883,13 @@ function getHTML(env) {
     const qrcodeDiv = document.getElementById('qrcode');
     const cookieBanner = document.getElementById('cookieBanner');
     const cookieBannerClose = document.getElementById('cookieBannerClose');
+    const sendRoleBtn = document.getElementById('sendRoleBtn');
+    const receiveRoleBtn = document.getElementById('receiveRoleBtn');
+    const roleHint = document.getElementById('roleHint');
+    const sendTypeSelector = document.getElementById('sendTypeSelector');
     const sendModeBtn = document.getElementById('sendModeBtn');
     const urlModeBtn = document.getElementById('urlModeBtn');
     const textModeBtn = document.getElementById('textModeBtn');
-    const receiveModeBtn = document.getElementById('receiveModeBtn');
     const sendSection = document.getElementById('sendSection');
     const urlSection = document.getElementById('urlSection');
     const textSection = document.getElementById('textSection');
@@ -2961,50 +3001,64 @@ function getHTML(env) {
       }
     });
 
-    sendModeBtn.addEventListener('click', () => {
-      sendModeBtn.classList.add('active');
-      urlModeBtn.classList.remove('active');
-      textModeBtn.classList.remove('active');
-      receiveModeBtn.classList.remove('active');
-      sendSection.classList.add('active');
-      urlSection.classList.remove('active');
-      textSection.classList.remove('active');
+    let lastSendTypeBtn = sendModeBtn;
+
+    function activateSendRole() {
+      sendRoleBtn.classList.add('active');
+      receiveRoleBtn.classList.remove('active');
+      sendTypeSelector.style.display = '';
       receiveSection.classList.remove('active');
+      roleHint.textContent = 'Share your room code with the other device';
+    }
+
+    sendRoleBtn.addEventListener('click', () => {
+      lastSendTypeBtn.click();
     });
 
-    urlModeBtn.addEventListener('click', () => {
-      urlModeBtn.classList.add('active');
-      sendModeBtn.classList.remove('active');
-      textModeBtn.classList.remove('active');
-      receiveModeBtn.classList.remove('active');
-      urlSection.classList.add('active');
-      sendSection.classList.remove('active');
-      textSection.classList.remove('active');
-      receiveSection.classList.remove('active');
-    });
-
-    textModeBtn.addEventListener('click', () => {
-      textModeBtn.classList.add('active');
-      sendModeBtn.classList.remove('active');
-      urlModeBtn.classList.remove('active');
-      receiveModeBtn.classList.remove('active');
-      textSection.classList.add('active');
-      sendSection.classList.remove('active');
-      urlSection.classList.remove('active');
-      receiveSection.classList.remove('active');
-      textInput.focus();
-    });
-
-    receiveModeBtn.addEventListener('click', () => {
-      receiveModeBtn.classList.add('active');
-      sendModeBtn.classList.remove('active');
-      urlModeBtn.classList.remove('active');
-      textModeBtn.classList.remove('active');
+    receiveRoleBtn.addEventListener('click', () => {
+      receiveRoleBtn.classList.add('active');
+      sendRoleBtn.classList.remove('active');
+      sendTypeSelector.style.display = 'none';
       receiveSection.classList.add('active');
       sendSection.classList.remove('active');
       urlSection.classList.remove('active');
       textSection.classList.remove('active');
+      roleHint.textContent = 'Enter the code shown on the other device';
       roomInput.focus();
+    });
+
+    sendModeBtn.addEventListener('click', () => {
+      activateSendRole();
+      lastSendTypeBtn = sendModeBtn;
+      sendModeBtn.classList.add('active');
+      urlModeBtn.classList.remove('active');
+      textModeBtn.classList.remove('active');
+      sendSection.classList.add('active');
+      urlSection.classList.remove('active');
+      textSection.classList.remove('active');
+    });
+
+    urlModeBtn.addEventListener('click', () => {
+      activateSendRole();
+      lastSendTypeBtn = urlModeBtn;
+      urlModeBtn.classList.add('active');
+      sendModeBtn.classList.remove('active');
+      textModeBtn.classList.remove('active');
+      urlSection.classList.add('active');
+      sendSection.classList.remove('active');
+      textSection.classList.remove('active');
+    });
+
+    textModeBtn.addEventListener('click', () => {
+      activateSendRole();
+      lastSendTypeBtn = textModeBtn;
+      textModeBtn.classList.add('active');
+      sendModeBtn.classList.remove('active');
+      urlModeBtn.classList.remove('active');
+      textSection.classList.add('active');
+      sendSection.classList.remove('active');
+      urlSection.classList.remove('active');
+      textInput.focus();
     });
     
     // File selection - click
