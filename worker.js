@@ -1683,6 +1683,78 @@ function getHTML(env) {
       transform: translateY(-1px);
     }
 
+    /* Receive success panel */
+    .receive-success {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px 0;
+      gap: 12px;
+    }
+
+    .receive-success.active {
+      display: flex;
+    }
+
+    .success-icon {
+      font-size: 64px;
+      line-height: 1;
+    }
+
+    .success-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .success-meta {
+      font-size: 14px;
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
+
+    .success-textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: monospace;
+      resize: vertical;
+      background: var(--input-bg);
+      color: var(--text-primary);
+      box-sizing: border-box;
+      min-height: 120px;
+      text-align: left;
+    }
+
+    .success-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .btn-reset {
+      background: none;
+      border: 2px solid var(--border-color);
+      color: var(--text-secondary);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.2s;
+    }
+
+    .btn-reset:hover {
+      border-color: #667eea;
+      color: #667eea;
+    }
+
     /* TeleHost promo */
     .telehost-promo {
       display: none;
@@ -2000,21 +2072,24 @@ function getHTML(env) {
       <div class="progress-text" id="progressText">Transferring...</div>
     </div>
     
-    <div class="download-area" id="downloadArea">
-      <div style="font-size: 48px; margin-bottom: 10px;">📦</div>
-      <div style="font-weight: 600; margin-bottom: 5px;" id="downloadFileName"></div>
-      <a href="#" class="download-btn" id="downloadBtn" download>Download File</a>
-    </div>
-
-    <div class="text-receive-area" id="textReceiveArea" style="display:none;">
-      <div style="font-size: 32px; margin-bottom: 8px;">📋</div>
-      <div style="font-weight: 600; margin-bottom: 10px; color: var(--text-primary);">Text Received!</div>
-      <textarea class="text-input" id="receivedTextDisplay" readonly style="text-align:left;"></textarea>
-      <button id="copyReceivedTextBtn" class="download-btn" style="border:none; cursor:pointer; margin-top: 10px;">📋 Copy to Clipboard</button>
-    </div>
-
-    <div class="telehost-promo" id="telehostPromo">
-      Need permanent file hosting? Try <a href="https://telehost.pages.dev" target="_blank" rel="noopener">TeleHost</a> — free &amp; forever.
+    <!-- Receive success panel (replaces right panel on transfer complete) -->
+    <div class="receive-success" id="receiveSuccessPanel">
+      <div class="success-icon" id="successIcon">📦</div>
+      <div class="success-title" id="successTitle">File Ready!</div>
+      <div class="success-meta" id="successMeta"></div>
+      <!-- File: download button -->
+      <div class="success-actions" id="successFileActions" style="display:none;">
+        <a href="#" class="btn" id="successDownloadBtn" download>⬇ Download File</a>
+      </div>
+      <!-- Text: textarea + copy -->
+      <div class="success-actions" id="successTextActions" style="display:none;">
+        <textarea class="success-textarea" id="successTextDisplay" readonly></textarea>
+        <button class="btn" id="successCopyBtn">📋 Copy to Clipboard</button>
+      </div>
+      <div class="telehost-promo" id="telehostPromo" style="width:100%;">
+        Need permanent file hosting? Try <a href="https://telehost.pages.dev" target="_blank" rel="noopener">TeleHost</a> — free &amp; forever.
+      </div>
+      <button class="btn-reset" id="successResetBtn">↩ Transfer Another</button>
     </div>
 
     <div class="error" id="error"></div>
@@ -2171,21 +2246,77 @@ function getHTML(env) {
     const pasteTextBtn = document.getElementById('pasteTextBtn');
     const clearTextBtn = document.getElementById('clearTextBtn');
     const sendTextBtn = document.getElementById('sendTextBtn');
-    const textReceiveArea = document.getElementById('textReceiveArea');
-    const receivedTextDisplay = document.getElementById('receivedTextDisplay');
-    const copyReceivedTextBtn = document.getElementById('copyReceivedTextBtn');
     const roomInput = document.getElementById('roomInput');
     const joinBtn = document.getElementById('joinBtn');
     const progress = document.getElementById('progress');
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
-    const downloadArea = document.getElementById('downloadArea');
-    const downloadFileName = document.getElementById('downloadFileName');
-    const downloadBtn = document.getElementById('downloadBtn');
     const errorDiv = document.getElementById('error');
     const toast = document.getElementById('toast');
     const telehostPromo = document.getElementById('telehostPromo');
+    const receiveSuccessPanel = document.getElementById('receiveSuccessPanel');
+    const successIcon = document.getElementById('successIcon');
+    const successTitle = document.getElementById('successTitle');
+    const successMeta = document.getElementById('successMeta');
+    const successFileActions = document.getElementById('successFileActions');
+    const successDownloadBtn = document.getElementById('successDownloadBtn');
+    const successTextActions = document.getElementById('successTextActions');
+    const successTextDisplay = document.getElementById('successTextDisplay');
+    const successCopyBtn = document.getElementById('successCopyBtn');
+    const successResetBtn = document.getElementById('successResetBtn');
     
+    // Show receive success panel (replaces right panel content)
+    function showReceiveSuccess(type, data) {
+      // Hide all normal right-panel content
+      document.querySelector('.role-selector').style.display = 'none';
+      roleHint.style.display = 'none';
+      sendTypeSelector.style.display = 'none';
+      sendSection.style.display = 'none';
+      urlSection.style.display = 'none';
+      textSection.style.display = 'none';
+      receiveSection.style.display = 'none';
+      progress.style.display = 'none';
+
+      // Reset both action blocks
+      successFileActions.style.display = 'none';
+      successTextActions.style.display = 'none';
+
+      if (type === 'file') {
+        successIcon.textContent = '📦';
+        successTitle.textContent = 'File Ready!';
+        successMeta.textContent = data.fileName;
+        successDownloadBtn.href = data.url;
+        successDownloadBtn.download = data.fileName;
+        successFileActions.style.display = 'flex';
+      } else if (type === 'text') {
+        successIcon.textContent = '📋';
+        successTitle.textContent = 'Text Received!';
+        successMeta.textContent = '';
+        successTextDisplay.value = data.content;
+        successTextActions.style.display = 'flex';
+      }
+
+      telehostPromo.style.display = 'block';
+      receiveSuccessPanel.classList.add('active');
+    }
+
+    // Reset back to normal state
+    successResetBtn.addEventListener('click', () => {
+      receiveSuccessPanel.classList.remove('active');
+      document.querySelector('.role-selector').style.display = '';
+      roleHint.style.display = '';
+      sendTypeSelector.style.display = '';
+      // Let the role buttons restore the correct section
+      receiveRoleBtn.click();
+    });
+
+    // Copy button in success panel
+    successCopyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(successTextDisplay.value).then(() => {
+        showToast('Copied to clipboard!');
+      });
+    });
+
     // Initialize
     init();
 
@@ -3018,14 +3149,9 @@ function getHTML(env) {
     }
     
     function handleFallbackLink(data) {
-      // Receiver gets download link
-      downloadArea.style.display = 'block';
-      downloadFileName.textContent = data.fileName;
-      downloadBtn.href = data.downloadUrl;
-      downloadBtn.download = data.fileName;
-
       statusText.textContent = 'File ready for download!';
       showToast('File received via Cloud Relay!');
+      showReceiveSuccess('file', { fileName: data.fileName, url: data.downloadUrl });
     }
 
     function handleUrlFallback(data) {
@@ -3046,11 +3172,9 @@ function getHTML(env) {
     }
 
     function showReceivedText(content) {
-      textReceiveArea.style.display = 'block';
-      receivedTextDisplay.value = content;
       statusText.textContent = '📋 Text received!';
-      showToast('Text received — tap to copy!');
-      telehostPromo.style.display = 'block';
+      showToast('Text received!');
+      showReceiveSuccess('text', { content });
     }
 
     async function sendText() {
@@ -3088,17 +3212,11 @@ function getHTML(env) {
     function downloadReceivedFile() {
       const blob = new Blob(receivedChunks);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-      
-      progress.style.display = 'none';
-      statusText.textContent = '✅ File downloaded!';
-      showToast('File downloaded successfully!');
-      telehostPromo.style.display = 'block';
-      
+
+      statusText.textContent = '✅ File ready!';
+      showToast('File received!');
+      showReceiveSuccess('file', { fileName, url });
+
       receivedChunks = [];
       receivedSize = 0;
     }
@@ -3363,6 +3481,9 @@ function getHTML(env) {
     document.addEventListener('dragenter', (e) => {
       if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
         dragCounter++;
+        if (receiveSuccessPanel.classList.contains('active')) {
+          successResetBtn.click();
+        }
         dragOverlay.classList.add('active');
       }
     });
@@ -3535,17 +3656,6 @@ function getHTML(env) {
       sendTextBtn.disabled = true;
     });
 
-    copyReceivedTextBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(receivedTextDisplay.value);
-        copyReceivedTextBtn.textContent = '✅ Copied!';
-        showToast('Copied to clipboard!');
-        setTimeout(() => { copyReceivedTextBtn.textContent = '📋 Copy to Clipboard'; }, 2000);
-      } catch (e) {
-        receivedTextDisplay.select();
-        showToast('Press Ctrl+C / Cmd+C to copy');
-      }
-    });
 
     sendTextBtn.addEventListener('click', sendText);
 
