@@ -1781,6 +1781,14 @@ function getHTML(env) {
         position: relative;
       }
 
+      .right-panel .upload-area {
+        padding: 60px 20px;
+      }
+
+      .right-panel .upload-icon {
+        font-size: 64px;
+      }
+
     }
   </style>
 </head>
