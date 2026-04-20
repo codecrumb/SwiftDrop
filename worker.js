@@ -1132,7 +1132,19 @@ function getHTML(env) {
     .room-code.connected {
       color: #166534;
     }
-    
+
+    body.dark-mode .room-code {
+      color: #60a5fa;
+    }
+
+    body.dark-mode .room-code.connected {
+      color: #4ade80;
+    }
+
+    body.dark-mode .status.clickable:hover .room-code {
+      color: #0369a1;
+    }
+
     .peer-info {
       font-size: 13px;
       color: var(--text-secondary);
