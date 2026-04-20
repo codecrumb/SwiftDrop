@@ -1855,6 +1855,7 @@ function getHTML(env) {
 
       .left-panel h1 {
         font-size: 26px;
+        margin-top: 10px;
         margin-bottom: 8px;
       }
 
@@ -1944,7 +1945,7 @@ function getHTML(env) {
       }
 
       .right-panel {
-        padding: 36px 32px 40px;
+        padding: 20px 32px 40px;
         min-height: 500px;
       }
 
