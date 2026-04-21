@@ -1624,6 +1624,172 @@ function getHTML(env) {
       transition: color 0.3s ease;
     }
 
+    /* Settings Button */
+    .settings-btn {
+      background: var(--border-color);
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      color: var(--text-secondary);
+    }
+
+    .settings-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .settings-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+    }
+
+    /* Settings Modal */
+    .settings-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .settings-modal.show {
+      display: flex;
+    }
+
+    .settings-modal-content {
+      background: var(--container-bg);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 400px;
+      width: 90%;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      animation: modalSlideIn 0.3s ease-out;
+      transition: background 0.3s ease;
+    }
+
+    .settings-modal-close {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: var(--file-info-bg);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .settings-modal-close:hover {
+      background: var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .settings-modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 24px;
+      transition: color 0.3s ease;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border-color);
+      gap: 16px;
+    }
+
+    .settings-row:last-child {
+      border-bottom: none;
+    }
+
+    .settings-label {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .settings-label span:first-child {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      transition: color 0.3s ease;
+    }
+
+    .settings-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      transition: color 0.3s ease;
+    }
+
+    .settings-toggle {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .settings-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .settings-toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--border-color);
+      border-radius: 24px;
+      transition: 0.2s;
+    }
+
+    .settings-toggle-slider::before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+
+    .settings-toggle input:checked + .settings-toggle-slider {
+      background: #667eea;
+    }
+
+    .settings-toggle input:checked + .settings-toggle-slider::before {
+      transform: translateX(20px);
+    }
+
     /* Paste Button */
     .paste-btn {
       background: var(--file-info-bg);
@@ -2048,6 +2214,7 @@ function getHTML(env) {
         <a class="github-link" href="https://github.com/codecrumb/SwiftDrop" target="_blank" rel="noopener" title="View on GitHub">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         </a>
+        <button class="settings-btn" id="settingsBtn" title="Settings"><i data-feather="settings"></i></button>
         <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode"><i data-feather="moon"></i></button>
       </div>
     </div>
@@ -2163,6 +2330,34 @@ function getHTML(env) {
        style="display:none;">
   </div>
 
+  <!-- Settings Modal -->
+  <div class="settings-modal" id="settingsModal">
+    <div class="settings-modal-content">
+      <button class="settings-modal-close" id="settingsModalClose">✕</button>
+      <div class="settings-modal-title">Settings</div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Auto-copy text</span>
+          <span class="settings-desc">Automatically copy received text to clipboard</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="autoCopyToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Auto-download files</span>
+          <span class="settings-desc">Automatically download files when received</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="autoDownloadToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
   <!-- QR Code Modal -->
   <div class="qr-modal" id="qrModal">
     <div class="qr-modal-content">
@@ -2217,6 +2412,41 @@ function getHTML(env) {
       const isDark = document.body.classList.contains('dark-mode');
       setThemeIcon(isDark);
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    });
+
+    // Settings Modal
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsModalClose = document.getElementById('settingsModalClose');
+    const autoCopyToggle = document.getElementById('autoCopyToggle');
+    const autoDownloadToggle = document.getElementById('autoDownloadToggle');
+
+    // Load saved settings (auto-copy default on, auto-download default off)
+    autoCopyToggle.checked = localStorage.getItem('autoCopyText') !== 'false';
+    autoDownloadToggle.checked = localStorage.getItem('autoDownloadFiles') === 'true';
+
+    autoCopyToggle.addEventListener('change', () => {
+      localStorage.setItem('autoCopyText', autoCopyToggle.checked ? 'true' : 'false');
+    });
+
+    autoDownloadToggle.addEventListener('change', () => {
+      localStorage.setItem('autoDownloadFiles', autoDownloadToggle.checked ? 'true' : 'false');
+    });
+
+    function openSettingsModal() {
+      settingsModal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSettingsModal() {
+      settingsModal.classList.remove('show');
+      document.body.style.overflow = '';
+    }
+
+    settingsBtn.addEventListener('click', openSettingsModal);
+    settingsModalClose.addEventListener('click', closeSettingsModal);
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) closeSettingsModal();
     });
 
     // Configuration
@@ -2365,13 +2595,35 @@ function getHTML(env) {
           a.textContent = \`⬇ \${fn}\`;
           successFileActions.appendChild(a);
         });
+        if (files.length > 1) {
+          const dlAll = document.createElement('button');
+          dlAll.className = 'btn';
+          dlAll.textContent = '⬇ Download All';
+          dlAll.addEventListener('click', () => {
+            successFileActions.querySelectorAll('a.btn').forEach(a => a.click());
+          });
+          successFileActions.appendChild(dlAll);
+        }
         successFileActions.style.display = 'flex';
+        if (localStorage.getItem('autoDownloadFiles') === 'true') {
+          files.forEach(({ url, fileName: fn }) => {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fn;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          });
+        }
       } else if (type === 'text') {
         successIcon.textContent = '📋';
         successTitle.textContent = 'Text Received!';
         successMeta.textContent = '';
         successTextDisplay.value = data.content;
         successTextActions.style.display = 'flex';
+        if (localStorage.getItem('autoCopyText') !== 'false') {
+          navigator.clipboard.writeText(data.content).then(() => showToast('Text copied to clipboard!'));
+        }
       }
 
       telehostPromo.style.display = 'block';
@@ -3585,10 +3837,11 @@ function getHTML(env) {
       }
     });
 
-    // QR Modal - Escape key to close
+    // Escape key to close modals
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && qrModal.classList.contains('show')) {
-        closeQRModal();
+      if (e.key === 'Escape') {
+        if (qrModal.classList.contains('show')) closeQRModal();
+        if (settingsModal.classList.contains('show')) closeSettingsModal();
       }
     });
 
@@ -3891,6 +4144,14 @@ function getHTML(env) {
       status.classList.remove('clickable');
 
       activateReceiveJoined(code);
+    });
+
+    // Auto-join when 6th digit is typed
+    roomInput.addEventListener('input', () => {
+      const code = roomInput.value.replace(/\D/g, '');
+      if (code.length === 6) {
+        joinBtn.click();
+      }
     });
   </script>
 </body>
