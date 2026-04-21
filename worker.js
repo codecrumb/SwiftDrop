@@ -2103,9 +2103,16 @@ function getHTML(env) {
 
     <!-- Receive Mode -->
     <div class="section" id="receiveSection">
-      <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter the 6-digit code from sender:</p>
-      <input type="text" id="roomInput" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]*">
-      <button class="btn" id="joinBtn">Join Room</button>
+      <div id="receiveJoinForm">
+        <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter the 6-digit code from sender:</p>
+        <input type="text" id="roomInput" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+        <button class="btn" id="joinBtn">Join Room</button>
+      </div>
+      <div id="receiveJoinedState" style="display:none; text-align:center; padding: 12px 0;">
+        <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
+        <div style="font-weight: 600; margin-bottom: 4px;">Connected to room <span id="receiveJoinedCode"></span></div>
+        <div style="font-size: 13px; color: #888;">Waiting for sender to transfer files…</div>
+      </div>
     </div>
     
     <div class="progress" id="progress">
@@ -2308,6 +2315,19 @@ function getHTML(env) {
     const successCopyBtn = document.getElementById('successCopyBtn');
     const successResetBtn = document.getElementById('successResetBtn');
     
+    const receiveJoinForm = document.getElementById('receiveJoinForm');
+    const receiveJoinedState = document.getElementById('receiveJoinedState');
+    const receiveJoinedCode = document.getElementById('receiveJoinedCode');
+
+    // Switch to receive tab and show "joined" state (hides code entry form)
+    function activateReceiveJoined(code) {
+      receiveRoleBtn.click();
+      receiveJoinForm.style.display = 'none';
+      receiveJoinedState.style.display = '';
+      receiveJoinedCode.textContent = code;
+      leftReceiveState.querySelector('.left-receive-sub').textContent = 'Waiting for sender to transfer files…';
+    }
+
     // Show receive success panel (replaces right panel content)
     function showReceiveSuccess(type, data) {
       // Hide all normal right-panel content
@@ -2355,6 +2375,10 @@ function getHTML(env) {
       textSection.style.display = '';
       receiveSection.style.display = '';
       progress.style.display = '';
+      // Reset receive section to show the join form again
+      receiveJoinForm.style.display = '';
+      receiveJoinedState.style.display = 'none';
+      leftReceiveState.querySelector('.left-receive-sub').textContent = 'Enter the code from the sender\'s screen';
       sendRoleBtn.click();
     });
 
@@ -2691,8 +2715,7 @@ function getHTML(env) {
         statusText.textContent = 'Joining room...';
         showToast('Joining room ' + roomCode + '...');
 
-        // Switch to send mode (receiver can still send files back)
-        sendModeBtn.click();
+        activateReceiveJoined(roomCode);
       } else {
         // Normal sender flow
         isSender = true;
@@ -3747,7 +3770,7 @@ function getHTML(env) {
       // Receivers don't get clickable status
       status.classList.remove('clickable');
 
-      sendModeBtn.click();
+      activateReceiveJoined(code);
     });
   </script>
 </body>
