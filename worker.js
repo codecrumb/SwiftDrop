@@ -2340,6 +2340,7 @@ function getHTML(env) {
         <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
         <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">Connected to room <span id="receiveJoinedCode"></span></div>
         <div style="font-size: 13px; color: #888;">Waiting for sender to transfer files…</div>
+        <button id="changeRoomBtn" style="margin-top: 10px; background: none; border: none; color: #888; font-size: 12px; cursor: pointer; text-decoration: underline; padding: 0;">Wrong room? Change</button>
       </div>
     </div>
     
@@ -2409,6 +2410,16 @@ function getHTML(env) {
           <span class="settings-toggle-slider"></span>
         </label>
       </div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Auto-join on code entry</span>
+          <span class="settings-desc">Automatically join when the 6th digit is typed (no need to tap Join)</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="autoJoinToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -2474,10 +2485,12 @@ function getHTML(env) {
     const settingsModalClose = document.getElementById('settingsModalClose');
     const autoCopyToggle = document.getElementById('autoCopyToggle');
     const autoDownloadToggle = document.getElementById('autoDownloadToggle');
+    const autoJoinToggle = document.getElementById('autoJoinToggle');
 
-    // Load saved settings (auto-copy default on, auto-download default off)
+    // Load saved settings (auto-copy default on, auto-download default off, auto-join default on)
     autoCopyToggle.checked = localStorage.getItem('autoCopyText') !== 'false';
     autoDownloadToggle.checked = localStorage.getItem('autoDownloadFiles') === 'true';
+    autoJoinToggle.checked = localStorage.getItem('autoJoinRoom') !== 'false';
 
     autoCopyToggle.addEventListener('change', () => {
       localStorage.setItem('autoCopyText', autoCopyToggle.checked ? 'true' : 'false');
@@ -2485,6 +2498,10 @@ function getHTML(env) {
 
     autoDownloadToggle.addEventListener('change', () => {
       localStorage.setItem('autoDownloadFiles', autoDownloadToggle.checked ? 'true' : 'false');
+    });
+
+    autoJoinToggle.addEventListener('change', () => {
+      localStorage.setItem('autoJoinRoom', autoJoinToggle.checked ? 'true' : 'false');
     });
 
     function openSettingsModal() {
@@ -2610,6 +2627,25 @@ function getHTML(env) {
     const receiveJoinForm = document.getElementById('receiveJoinForm');
     const receiveJoinedState = document.getElementById('receiveJoinedState');
     const receiveJoinedCode = document.getElementById('receiveJoinedCode');
+    const changeRoomBtn = document.getElementById('changeRoomBtn');
+
+    changeRoomBtn.addEventListener('click', () => {
+      // Disconnect from current room
+      if (ws) {
+        isIntentionalClose = true;
+        ws.close();
+        isIntentionalClose = false;
+        ws = null;
+      }
+      roomCode = null;
+      // Pre-fill the input with the current code so they can edit it
+      roomInput.value = receiveJoinedCode.textContent;
+      // Show the join form again
+      receiveJoinedState.style.display = 'none';
+      receiveJoinForm.style.display = '';
+      roomInput.focus();
+      roomInput.select();
+    });
 
     // Render the selected files list with individual remove buttons
     function renderFileList() {
@@ -4195,7 +4231,7 @@ function getHTML(env) {
     // Auto-join when 6th digit is typed
     roomInput.addEventListener('input', () => {
       const code = roomInput.value.replace(/\D/g, '');
-      if (code.length === 6) {
+      if (code.length === 6 && localStorage.getItem('autoJoinRoom') !== 'false') {
         joinBtn.click();
       }
     });
