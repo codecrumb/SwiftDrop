@@ -749,6 +749,9 @@ export class SignalingRoom {
     // Hibernation API: DO can sleep between messages; connections stay open
     this.state.acceptWebSocket(server, [sessionId]);
 
+    // Cancel any pending eviction alarm — room is active again
+    await this.state.storage.deleteAlarm();
+
     const allPeers = this.state.getWebSockets();
     console.log(`[Room] New peer: ${sessionId}. Total: ${allPeers.length}`);
 
@@ -792,8 +795,9 @@ export class SignalingRoom {
   }
 
   // Called by the runtime when a connection closes
-  webSocketClose(ws, code, reason, wasClean) {
+  async webSocketClose(ws, code, reason, wasClean) {
     const { sessionId } = ws.deserializeAttachment();
+    // getWebSockets() still includes the closing socket during this handler
     const remaining = this.state.getWebSockets().length - 1;
     console.log(`[Room] Peer left: ${sessionId}. Remaining: ${remaining}`);
 
@@ -802,6 +806,11 @@ export class SignalingRoom {
       sessionId,
       peersCount: remaining
     }, sessionId);
+
+    if (remaining === 0) {
+      await this.state.storage.setAlarm(Date.now() + 5 * 60 * 1000);
+      console.log('[Room] Room empty. Alarm set for 5 minutes.');
+    }
   }
 
   // Called by the runtime on WebSocket error
@@ -896,6 +905,17 @@ export class SignalingRoom {
         }
       }
     }
+  }
+
+  // Called when the eviction alarm fires (5 min after last peer left)
+  async alarm() {
+    const peers = this.state.getWebSockets();
+    if (peers.length > 0) {
+      // A peer rejoined between the alarm being set and firing — nothing to do
+      console.log(`[Room] Alarm fired but ${peers.length} peer(s) still present. Skipping.`);
+      return;
+    }
+    console.log('[Room] Alarm fired: room confirmed empty. DO will evict naturally.');
   }
 }
 
@@ -2229,6 +2249,7 @@ function getHTML(env) {
     let wsReconnectAttempts = 0;
     let wsReconnectTimeout = null;
     let isIntentionalClose = false;
+    let pingInterval = null;
 
     // Elements
     const status = document.getElementById('status');
@@ -2702,6 +2723,14 @@ function getHTML(env) {
         console.log('✅ WebSocket connected');
         wsReconnectAttempts = 0; // Reset reconnect counter on successful connection
 
+        // Send keepalive pings to prevent browser from closing idle connections
+        clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 25000);
+
         if (isReconnect) {
           statusText.textContent = 'Reconnected!';
           showToast('Connection restored!');
@@ -2721,6 +2750,9 @@ function getHTML(env) {
 
       ws.onclose = (event) => {
         console.log('WebSocket closed', event.code, event.reason);
+
+        clearInterval(pingInterval);
+        pingInterval = null;
 
         // Don't reconnect if close was intentional or max retries exceeded
         if (isIntentionalClose || wsReconnectAttempts >= 5) {
@@ -2800,6 +2832,10 @@ function getHTML(env) {
           roomCodeEl.classList.remove('connected');
           sendBtn.disabled = true;
           showToast('Peer disconnected');
+          break;
+
+        case 'pong':
+          // keepalive acknowledgement — no action needed
           break;
       }
     }
