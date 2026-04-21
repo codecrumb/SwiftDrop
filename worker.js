@@ -1244,7 +1244,7 @@ function getHTML(env) {
       display: block;
     }
     
-    input[type="text"] {
+    input[type="text"], input[type="url"] {
       width: 100%;
       padding: 12px;
       border: 2px solid var(--border-color);
@@ -1260,7 +1260,7 @@ function getHTML(env) {
       transition: all 0.3s ease;
     }
 
-    input[type="text"]:focus {
+    input[type="text"]:focus, input[type="url"]:focus {
       outline: none;
       border-color: #667eea;
     }
@@ -2085,7 +2085,7 @@ function getHTML(env) {
     <div class="section" id="urlSection">
       <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter URL to share:</p>
       <div style="display: flex; gap: 8px; margin-bottom: 15px;">
-        <input type="text" id="urlInput" placeholder="https://example.com"
+        <input type="url" id="urlInput" placeholder="https://example.com" inputmode="url"
                style="flex: 1; text-transform: none; letter-spacing: normal; margin-bottom: 0;">
         <button id="pasteUrlBtn" class="paste-btn">
           📋 Paste
