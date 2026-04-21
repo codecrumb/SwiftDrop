@@ -2117,7 +2117,7 @@ function getHTML(env) {
       </div>
       <div id="receiveJoinedState" style="display:none; text-align:center; padding: 12px 0;">
         <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
-        <div style="font-weight: 600; margin-bottom: 4px;">Connected to room <span id="receiveJoinedCode"></span></div>
+        <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">Connected to room <span id="receiveJoinedCode"></span></div>
         <div style="font-size: 13px; color: #888;">Waiting for sender to transfer files…</div>
       </div>
     </div>
