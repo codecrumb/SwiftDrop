@@ -848,6 +848,8 @@ export class SignalingRoom {
           fileId: data.fileId,
           downloadUrl: data.downloadUrl,
           fileName: data.fileName,
+          fileIndex: data.fileIndex,
+          fileCount: data.fileCount,
           from: fromSessionId
         }, fromSessionId);
         break;
@@ -1774,6 +1776,11 @@ function getHTML(env) {
       width: 100%;
     }
 
+    #successFileActions {
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
     .btn-reset {
       background: none;
       border: 2px solid var(--border-color);
@@ -2061,10 +2068,10 @@ function getHTML(env) {
     <div class="section active" id="sendSection">
       <div class="upload-area" id="uploadArea">
         <div class="upload-icon">📁</div>
-        <p><strong>Click or drag to select a file</strong></p>
+        <p><strong>Click or drag to select files</strong></p>
         <p style="font-size: 12px; color: #999; margin-top: 5px;">Direct P2P transfer</p>
       </div>
-      <input type="file" id="fileInput">
+      <input type="file" id="fileInput" multiple>
       
       <div class="file-info" id="fileInfo">
         <div class="file-name" id="fileName"></div>
@@ -2127,10 +2134,8 @@ function getHTML(env) {
       <div class="success-icon" id="successIcon">📦</div>
       <div class="success-title" id="successTitle">File Ready!</div>
       <div class="success-meta" id="successMeta"></div>
-      <!-- File: download button -->
-      <div class="success-actions" id="successFileActions" style="display:none;">
-        <a href="#" class="btn" id="successDownloadBtn" download>⬇ Download File</a>
-      </div>
+      <!-- File: download button(s) — populated dynamically -->
+      <div class="success-actions" id="successFileActions" style="display:none;"></div>
       <!-- Text: textarea + copy -->
       <div class="success-actions" id="successTextActions" style="display:none;">
         <textarea class="success-textarea" id="successTextDisplay" readonly></textarea>
@@ -2245,7 +2250,10 @@ function getHTML(env) {
     let sessionId = null;
     let roomCode = null;
     let isSender = true;
-    let selectedFile = null;
+    let selectedFiles = [];        // Array<File>
+    let receivedFiles = [];        // {fileName, url}[] collected across a batch
+    let pendingFileCount = 0;      // total files expected in current batch
+    let receivedFileCount = 0;     // files completed so far in current batch
     let receivedChunks = [];
     let receivedSize = 0;
     let totalSize = 0;
@@ -2309,7 +2317,6 @@ function getHTML(env) {
     const successTitle = document.getElementById('successTitle');
     const successMeta = document.getElementById('successMeta');
     const successFileActions = document.getElementById('successFileActions');
-    const successDownloadBtn = document.getElementById('successDownloadBtn');
     const successTextActions = document.getElementById('successTextActions');
     const successTextDisplay = document.getElementById('successTextDisplay');
     const successCopyBtn = document.getElementById('successCopyBtn');
@@ -2344,12 +2351,20 @@ function getHTML(env) {
       successFileActions.style.display = 'none';
       successTextActions.style.display = 'none';
 
-      if (type === 'file') {
+      if (type === 'files') {
+        const files = Array.isArray(data) ? data : [data];
         successIcon.textContent = '📦';
-        successTitle.textContent = 'File Ready!';
-        successMeta.textContent = data.fileName;
-        successDownloadBtn.href = data.url;
-        successDownloadBtn.download = data.fileName;
+        successTitle.textContent = files.length === 1 ? 'File Ready!' : \`\${files.length} Files Ready!\`;
+        successMeta.textContent = '';
+        successFileActions.innerHTML = '';
+        files.forEach(({ fileName: fn, url }) => {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fn;
+          a.className = 'btn';
+          a.textContent = \`⬇ \${fn}\`;
+          successFileActions.appendChild(a);
+        });
         successFileActions.style.display = 'flex';
       } else if (type === 'text') {
         successIcon.textContent = '📋';
@@ -2425,21 +2440,32 @@ function getHTML(env) {
         const manifest = await manifestRes.json();
 
         if (manifest.files && manifest.files.length > 0) {
-          const meta = manifest.files[0];
-          const fileRes = await cache.match(meta.key);
-          if (fileRes) {
-            const blob = await fileRes.blob();
-            const file = new File([blob], meta.name, { type: meta.type || blob.type || 'application/octet-stream' });
+          const loadedFiles = [];
+          for (const meta of manifest.files) {
+            const fileRes = await cache.match(meta.key);
+            if (fileRes) {
+              const blob = await fileRes.blob();
+              loadedFiles.push(new File([blob], meta.name, { type: meta.type || blob.type || 'application/octet-stream' }));
+            }
+          }
 
+          if (loadedFiles.length > 0) {
             sendModeBtn.click();
+            selectedFiles = loadedFiles;
             try {
               const dt = new DataTransfer();
-              dt.items.add(file);
+              loadedFiles.forEach(f => dt.items.add(f));
               fileInput.files = dt.files;
-            } catch (_) { /* DataTransfer not supported on some UA — selectedFile is still set */ }
-            selectedFile = file;
-            fileNameEl.textContent = file.name;
-            fileSizeEl.textContent = formatFileSize(file.size);
+            } catch (_) {}
+
+            if (selectedFiles.length === 1) {
+              fileNameEl.textContent = selectedFiles[0].name;
+              fileSizeEl.textContent = formatFileSize(selectedFiles[0].size);
+            } else {
+              const totalBytes = selectedFiles.reduce((s, f) => s + f.size, 0);
+              fileNameEl.textContent = selectedFiles.length + ' files selected';
+              fileSizeEl.textContent = formatFileSize(totalBytes) + ' total';
+            }
             fileInfo.style.display = 'block';
 
             if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
@@ -2450,10 +2476,9 @@ function getHTML(env) {
               updateSendButton('waiting');
             }
 
-            showToast('Shared: ' + file.name);
-            if (manifest.files.length > 1) {
-              showError('Only the first of ' + manifest.files.length + ' shared files was loaded. Send them one at a time.');
-            }
+            showToast(selectedFiles.length === 1
+              ? ('Shared: ' + selectedFiles[0].name)
+              : ('Shared ' + selectedFiles.length + ' files'));
           }
         } else if (manifest.url) {
           urlModeBtn.click();
@@ -2517,7 +2542,7 @@ function getHTML(env) {
 
     // Helper function to update send button state
     function updateSendButton(state) {
-      if (!selectedFile) return;
+      if (selectedFiles.length === 0) return;
 
       // Remove all button state classes
       sendBtn.className = 'btn';
@@ -3031,16 +3056,33 @@ function getHTML(env) {
             return;
           }
           
+          // Handle batch-start announcement
+          if (data.type === 'file-batch-start') {
+            pendingFileCount = data.fileCount;
+            receivedFileCount = 0;
+            receivedFiles = [];
+            return;
+          }
+
           // Handle file metadata
+          // Backward compat: old sender never sent file-batch-start
+          if (pendingFileCount === 0) {
+            pendingFileCount = 1;
+            receivedFileCount = 0;
+            receivedFiles = [];
+          }
+
           fileName = data.fileName;
           totalSize = data.fileSize;
-          
-          statusText.textContent = 'Receiving file via P2P...';
+
+          statusText.textContent = pendingFileCount > 1
+            ? \`Receiving file \${(data.fileIndex ?? 0) + 1}/\${pendingFileCount}...\`
+            : 'Receiving file via P2P...';
           fileInfo.style.display = 'block';
           fileNameEl.textContent = fileName;
           fileSizeEl.textContent = formatFileSize(totalSize);
           progress.style.display = 'block';
-          
+
           receivedChunks = [];
           receivedSize = 0;
         } else {
@@ -3090,8 +3132,8 @@ function getHTML(env) {
     }
     
     async function sendFile() {
-      if (!selectedFile) return;
-      
+      if (selectedFiles.length === 0) return;
+
       // Try P2P first if connected
       if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
         await sendFileP2P();
@@ -3103,127 +3145,161 @@ function getHTML(env) {
     async function sendFileP2P() {
       sendBtn.disabled = true;
       progress.style.display = 'block';
-      
-      // Send metadata
+
+      const totalBytes = selectedFiles.reduce((s, f) => s + f.size, 0);
+
+      // Announce batch size to receiver
       dataChannel.send(JSON.stringify({
-        fileName: selectedFile.name,
-        fileSize: selectedFile.size
+        type: 'file-batch-start',
+        fileCount: selectedFiles.length
       }));
-      
-      // Send file in chunks
-      const reader = new FileReader();
-      let offset = 0;
-      
-      reader.onload = (e) => {
-        dataChannel.send(e.target.result);
-        offset += e.target.result.byteLength;
-        
-        const percent = (offset / selectedFile.size) * 100;
-        progressFill.style.width = percent + '%';
-        progressText.textContent = \`Sending... \${Math.round(percent)}%\`;
-        
-        if (offset < selectedFile.size) {
-          readSlice(offset);
-        } else {
-          progressText.textContent = '✅ Transfer complete!';
-          showToast('File sent successfully!');
-          telehostPromo.style.display = 'block';
-          setTimeout(() => {
-            progress.style.display = 'none';
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send Another File';
-          }, 2000);
-        }
-      };
-      
-      function readSlice(o) {
-        const slice = selectedFile.slice(o, o + CONFIG.chunkSize);
-        reader.readAsArrayBuffer(slice);
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+
+        // Send per-file metadata
+        dataChannel.send(JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          fileIndex: i
+        }));
+
+        // Send chunks — wrapped in a Promise so we await completion before next file
+        await new Promise((resolve) => {
+          const reader = new FileReader();
+          let offset = 0;
+          const priorBytes = selectedFiles.slice(0, i).reduce((s, f) => s + f.size, 0);
+
+          reader.onload = (e) => {
+            dataChannel.send(e.target.result);
+            offset += e.target.result.byteLength;
+
+            const percent = ((priorBytes + offset) / totalBytes) * 100;
+            progressFill.style.width = percent + '%';
+            progressText.textContent = selectedFiles.length > 1
+              ? \`Sending \${i + 1}/\${selectedFiles.length}: \${Math.round(percent)}%\`
+              : \`Sending... \${Math.round(percent)}%\`;
+
+            if (offset < file.size) {
+              readSlice(offset);
+            } else {
+              resolve();
+            }
+          };
+
+          function readSlice(o) {
+            const slice = file.slice(o, o + CONFIG.chunkSize);
+            reader.readAsArrayBuffer(slice);
+          }
+
+          readSlice(0);
+        });
       }
-      
-      readSlice(0);
+
+      progressText.textContent = '✅ Transfer complete!';
+      showToast(selectedFiles.length === 1 ? 'File sent successfully!' : \`\${selectedFiles.length} files sent!\`);
+      telehostPromo.style.display = 'block';
+      setTimeout(() => {
+        progress.style.display = 'none';
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send Another File';
+      }, 2000);
     }
     
     async function sendFileFallback() {
       try {
-        // Check file size limit for R2
-        if (selectedFile.size > CONFIG.maxFileSize) {
-          showError('File too large for Cloud Relay (max 20MB). This file can only be sent via P2P.');
-          sendBtn.disabled = false;
-          return;
+        // Validate all files up front
+        for (const file of selectedFiles) {
+          if (file.size > CONFIG.maxFileSize) {
+            showError(\`"\${file.name}" is too large for Cloud Relay (max 20MB). Use P2P mode.\`);
+            sendBtn.disabled = false;
+            return;
+          }
         }
 
         sendBtn.disabled = true;
         progress.style.display = 'block';
-        progressText.textContent = 'Verifying...';
 
-        // Get Turnstile token for bot protection
-        let token;
-        try {
-          token = await getTurnstileToken();
-        } catch (error) {
-          console.error('Turnstile verification failed:', error);
-          showError('Verification failed. Please try again.');
-          sendBtn.disabled = false;
-          progress.style.display = 'none';
-          return;
-        }
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
 
-        progressText.textContent = 'Uploading to cloud...';
+          progressText.textContent = selectedFiles.length > 1
+            ? \`Verifying file \${i + 1}/\${selectedFiles.length}...\`
+            : 'Verifying...';
 
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        formData.append('roomCode', roomCode);
-        formData.append('fileName', selectedFile.name);
-        formData.append('turnstileToken', token);
-
-        const response = await fetch('/upload', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (!response.ok) {
-          const result = await response.json();
-          if (response.status === 403) {
-            throw new Error('Bot verification failed. Please refresh and try again.');
+          // Get Turnstile token for bot protection (one per file)
+          let token;
+          try {
+            token = await getTurnstileToken();
+          } catch (error) {
+            console.error('Turnstile verification failed:', error);
+            showError('Verification failed. Please try again.');
+            sendBtn.disabled = false;
+            progress.style.display = 'none';
+            return;
           }
-          throw new Error(result.error || 'Upload failed');
-        }
 
-        const result = await response.json();
+          progressText.textContent = selectedFiles.length > 1
+            ? \`Uploading \${i + 1}/\${selectedFiles.length}: \${file.name}...\`
+            : 'Uploading to cloud...';
 
-        if (result.success) {
-          progressFill.style.width = '100%';
-          progressText.textContent = '✅ Uploaded! Sharing link...';
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('roomCode', roomCode);
+          formData.append('fileName', file.name);
+          formData.append('turnstileToken', token);
 
-          // Send download link to receiver via signaling
+          const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!response.ok) {
+            const result = await response.json();
+            if (response.status === 403) {
+              throw new Error('Bot verification failed. Please refresh and try again.');
+            }
+            throw new Error(result.error || 'Upload failed');
+          }
+
+          const result = await response.json();
+          if (!result.success) throw new Error(result.error || 'Upload failed');
+
+          progressFill.style.width = \`\${((i + 1) / selectedFiles.length) * 100}%\`;
+
+          // Notify receiver about this file
           ws.send(JSON.stringify({
             type: 'fallback-link',
             fileId: result.fileId,
             downloadUrl: result.downloadUrl,
-            fileName: selectedFile.name
+            fileName: file.name,
+            fileIndex: i,
+            fileCount: selectedFiles.length
           }));
 
-          showToast('File uploaded! Link sent to receiver.');
-
-          setTimeout(() => {
-            progress.style.display = 'none';
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send Another File';
-          }, 2000);
-        } else {
-          throw new Error(result.error || 'Upload failed');
+          // Reset Turnstile widget so it can issue a fresh token for the next file
+          if (window.turnstile && i < selectedFiles.length - 1) {
+            window.turnstile.reset('#turnstileWidget');
+          }
         }
-        
+
+        progressText.textContent = '✅ Uploaded! Links sent.';
+        showToast(selectedFiles.length === 1 ? 'File uploaded! Link sent to receiver.' : \`\${selectedFiles.length} files uploaded!\`);
+
+        setTimeout(() => {
+          progress.style.display = 'none';
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send Another File';
+        }, 2000);
+
       } catch (error) {
         console.error('❌ Fallback upload error:', error);
 
-        // Provide helpful error message based on error type
         let errorMessage = error.message || 'Upload failed';
         if (error.message && error.message.includes('NetworkError')) {
           errorMessage = 'Network error. Please check your connection and try again.';
         } else if (error.message && error.message.includes('Bot verification')) {
-          errorMessage = error.message; // Use specific bot verification error
+          errorMessage = error.message;
         } else if (!error.message || error.message === 'Upload failed') {
           errorMessage = 'Upload failed. Please check your connection and try again.';
         }
@@ -3235,9 +3311,26 @@ function getHTML(env) {
     }
     
     function handleFallbackLink(data) {
-      statusText.textContent = 'File ready for download!';
-      showToast('File received via Cloud Relay!');
-      showReceiveSuccess('file', { fileName: data.fileName, url: data.downloadUrl });
+      const totalInBatch = data.fileCount ?? 1;
+      if ((data.fileIndex ?? 0) === 0 || receivedFiles.length === 0) {
+        receivedFiles = [];
+        pendingFileCount = totalInBatch;
+        receivedFileCount = 0;
+      }
+
+      receivedFiles.push({ fileName: data.fileName, url: data.downloadUrl });
+      receivedFileCount++;
+
+      if (receivedFileCount >= pendingFileCount) {
+        statusText.textContent = receivedFiles.length === 1 ? 'File ready for download!' : 'All files ready!';
+        showToast(receivedFiles.length === 1 ? 'File received via Cloud Relay!' : \`\${receivedFiles.length} files received!\`);
+        showReceiveSuccess('files', receivedFiles);
+        pendingFileCount = 0;
+        receivedFileCount = 0;
+      } else {
+        statusText.textContent = \`Received \${receivedFileCount}/\${pendingFileCount} files...\`;
+        showToast(\`File \${receivedFileCount}/\${pendingFileCount} received\`);
+      }
     }
 
     function handleUrlFallback(data) {
@@ -3299,12 +3392,20 @@ function getHTML(env) {
       const blob = new Blob(receivedChunks);
       const url = URL.createObjectURL(blob);
 
-      statusText.textContent = '✅ File ready!';
-      showToast('File received!');
-      showReceiveSuccess('file', { fileName, url });
-
+      receivedFiles.push({ fileName, url });
+      receivedFileCount++;
       receivedChunks = [];
       receivedSize = 0;
+
+      if (receivedFileCount >= pendingFileCount) {
+        statusText.textContent = receivedFiles.length === 1 ? '✅ File ready!' : '✅ All files ready!';
+        showToast(receivedFiles.length === 1 ? 'File received!' : \`\${receivedFiles.length} files received!\`);
+        showReceiveSuccess('files', receivedFiles);
+        pendingFileCount = 0;
+        receivedFileCount = 0;
+      } else {
+        progressText.textContent = \`File \${receivedFileCount}/\${pendingFileCount} received, waiting for next...\`;
+      }
     }
     
     async function sendUrl() {
@@ -3592,17 +3693,24 @@ function getHTML(env) {
       dragCounter = 0;
       dragOverlay.classList.remove('active');
 
-      const files = e.dataTransfer.files;
+      const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
         // Switch to send mode if not already there
         sendModeBtn.click();
 
+        selectedFiles = files;
         const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(files[0]);
+        files.forEach(f => dataTransfer.items.add(f));
         fileInput.files = dataTransfer.files;
-        selectedFile = files[0];
-        fileNameEl.textContent = selectedFile.name;
-        fileSizeEl.textContent = formatFileSize(selectedFile.size);
+
+        if (selectedFiles.length === 1) {
+          fileNameEl.textContent = selectedFiles[0].name;
+          fileSizeEl.textContent = formatFileSize(selectedFiles[0].size);
+        } else {
+          const total = selectedFiles.reduce((s, f) => s + f.size, 0);
+          fileNameEl.textContent = selectedFiles.length + ' files selected';
+          fileSizeEl.textContent = formatFileSize(total) + ' total';
+        }
         fileInfo.style.display = 'block';
 
         if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
@@ -3613,7 +3721,9 @@ function getHTML(env) {
           updateSendButton('waiting');
         }
 
-        showToast('File selected: ' + selectedFile.name);
+        showToast(selectedFiles.length === 1
+          ? ('File selected: ' + selectedFiles[0].name)
+          : (selectedFiles.length + ' files selected'));
       }
     });
 
@@ -3634,46 +3744,56 @@ function getHTML(env) {
       e.preventDefault();
       uploadArea.style.borderColor = '#ddd';
       uploadArea.style.background = '';
-      
-      const files = e.dataTransfer.files;
+
+      const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
-        // Simulate file input change
+        selectedFiles = files;
         const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(files[0]);
+        files.forEach(f => dataTransfer.items.add(f));
         fileInput.files = dataTransfer.files;
-        
-        // Trigger change event
-        selectedFile = files[0];
-        fileNameEl.textContent = selectedFile.name;
-        fileSizeEl.textContent = formatFileSize(selectedFile.size);
+
+        if (selectedFiles.length === 1) {
+          fileNameEl.textContent = selectedFiles[0].name;
+          fileSizeEl.textContent = formatFileSize(selectedFiles[0].size);
+        } else {
+          const total = selectedFiles.reduce((s, f) => s + f.size, 0);
+          fileNameEl.textContent = selectedFiles.length + ' files selected';
+          fileSizeEl.textContent = formatFileSize(total) + ' total';
+        }
         fileInfo.style.display = 'block';
 
-        // Update button based on current connection state
         if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
           updateSendButton('p2p');
         } else if (ws && ws.readyState === WebSocket.OPEN) {
-          // Connected via websocket but P2P not ready
           updateSendButton('connecting');
         } else {
           updateSendButton('waiting');
         }
 
-        showToast('File selected: ' + selectedFile.name);
+        showToast(selectedFiles.length === 1
+          ? ('File selected: ' + selectedFiles[0].name)
+          : (selectedFiles.length + ' files selected'));
       }
     });
     
     fileInput.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) {
-        selectedFile = e.target.files[0];
-        fileNameEl.textContent = selectedFile.name;
-        fileSizeEl.textContent = formatFileSize(selectedFile.size);
+      const files = Array.from(e.target.files);
+      if (files.length > 0) {
+        selectedFiles = files;
+
+        if (selectedFiles.length === 1) {
+          fileNameEl.textContent = selectedFiles[0].name;
+          fileSizeEl.textContent = formatFileSize(selectedFiles[0].size);
+        } else {
+          const total = selectedFiles.reduce((s, f) => s + f.size, 0);
+          fileNameEl.textContent = selectedFiles.length + ' files selected';
+          fileSizeEl.textContent = formatFileSize(total) + ' total';
+        }
         fileInfo.style.display = 'block';
 
-        // Update button based on current connection state
         if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
           updateSendButton('p2p');
         } else if (ws && ws.readyState === WebSocket.OPEN) {
-          // Connected via websocket but P2P not ready
           updateSendButton('connecting');
         } else {
           updateSendButton('waiting');
