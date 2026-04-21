@@ -722,90 +722,96 @@ async function serveIcon(pathname) {
 
 /**
  * Durable Object: SignalingRoom
- * Manages WebSocket connections and WebRTC signaling for a room
+ * Manages WebSocket connections and WebRTC signaling for a room.
+ * Uses the Hibernation API so the DO sleeps between messages and only
+ * charges wall time while actively processing — not while connections sit idle.
  */
 export class SignalingRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.sessions = new Map(); // sessionId -> { ws, metadata }
   }
-  
+
   async fetch(request) {
     // Upgrade to WebSocket
     const upgradeHeader = request.headers.get('Upgrade');
     if (!upgradeHeader || upgradeHeader !== 'websocket') {
       return new Response('Expected WebSocket', { status: 426 });
     }
-    
+
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
-    
-    server.accept();
-    
-    // Generate unique session ID
-    const sessionId = crypto.randomUUID();
-    this.sessions.set(sessionId, { ws: server, joinedAt: Date.now() });
 
-    console.log(`[Room] New peer: ${sessionId}. Total: ${this.sessions.size}`);
+    // Generate unique session ID and attach it to the socket so it survives hibernation
+    const sessionId = crypto.randomUUID();
+    server.serializeAttachment({ sessionId, joinedAt: Date.now() });
+
+    // Hibernation API: DO can sleep between messages; connections stay open
+    this.state.acceptWebSocket(server, [sessionId]);
+
+    const allPeers = this.state.getWebSockets();
+    console.log(`[Room] New peer: ${sessionId}. Total: ${allPeers.length}`);
 
     // Analytics: Track P2P connection attempt
     console.log(JSON.stringify({
       event: 'peer_connected',
       method: 'p2p',
-      peersInRoom: this.sessions.size,
+      peersInRoom: allPeers.length,
       timestamp: new Date().toISOString()
     }));
-    
+
     // Send connection confirmation
     server.send(JSON.stringify({
       type: 'connected',
       sessionId,
-      peersCount: this.sessions.size - 1
+      peersCount: allPeers.length - 1
     }));
-    
+
     // Notify other peers
     this.broadcast({
       type: 'peer-joined',
       sessionId,
-      peersCount: this.sessions.size
+      peersCount: allPeers.length
     }, sessionId);
-    
-    // Handle messages
-    server.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        this.handleMessage(sessionId, data);
-      } catch (error) {
-        console.error('[Room] Invalid message:', error);
-      }
-    });
-    
-    // Handle disconnection
-    server.addEventListener('close', () => {
-      this.sessions.delete(sessionId);
-      console.log(`[Room] Peer left: ${sessionId}. Remaining: ${this.sessions.size}`);
-      
-      this.broadcast({
-        type: 'peer-left',
-        sessionId,
-        peersCount: this.sessions.size
-      });
-    });
-    
-    server.addEventListener('error', (error) => {
-      console.error('[Room] WebSocket error:', error);
-    });
-    
+
     return new Response(null, {
       status: 101,
       webSocket: client
     });
   }
-  
-  handleMessage(fromSessionId, data) {
+
+  // Called by the runtime when a message arrives (DO wakes from hibernation if needed)
+  webSocketMessage(ws, message) {
+    try {
+      const { sessionId } = ws.deserializeAttachment();
+      const data = JSON.parse(message);
+      this.handleMessage(sessionId, data, ws);
+    } catch (error) {
+      console.error('[Room] Invalid message:', error);
+    }
+  }
+
+  // Called by the runtime when a connection closes
+  webSocketClose(ws, code, reason, wasClean) {
+    const { sessionId } = ws.deserializeAttachment();
+    const remaining = this.state.getWebSockets().length - 1;
+    console.log(`[Room] Peer left: ${sessionId}. Remaining: ${remaining}`);
+
+    this.broadcast({
+      type: 'peer-left',
+      sessionId,
+      peersCount: remaining
+    }, sessionId);
+  }
+
+  // Called by the runtime on WebSocket error
+  webSocketError(ws, error) {
+    console.error('[Room] WebSocket error:', error);
+  }
+
+  handleMessage(fromSessionId, data, fromWs) {
     console.log(`[Room] Message: ${data.type} from ${fromSessionId.substring(0, 8)}`);
-    
+
     switch (data.type) {
       case 'offer':
       case 'answer':
@@ -825,7 +831,7 @@ export class SignalingRoom {
           }, fromSessionId);
         }
         break;
-        
+
       case 'fallback-link':
         // Relay fallback download link to other peer
         this.broadcast({
@@ -858,34 +864,33 @@ export class SignalingRoom {
 
       case 'ping':
         // Keep-alive
-        const session = this.sessions.get(fromSessionId);
-        if (session) {
-          session.ws.send(JSON.stringify({ type: 'pong' }));
-        }
+        fromWs.send(JSON.stringify({ type: 'pong' }));
         break;
-        
+
       default:
         console.log(`[Room] Unknown message type: ${data.type}`);
     }
   }
-  
+
   sendTo(sessionId, message) {
-    const session = this.sessions.get(sessionId);
-    if (session) {
+    // Tags let us look up a specific WebSocket directly
+    const [ws] = this.state.getWebSockets(sessionId);
+    if (ws) {
       try {
-        session.ws.send(JSON.stringify(message));
+        ws.send(JSON.stringify(message));
       } catch (error) {
         console.error('[Room] Send error:', error);
       }
     }
   }
-  
+
   broadcast(message, excludeSessionId = null) {
     const payload = JSON.stringify(message);
-    for (const [sessionId, session] of this.sessions) {
+    for (const ws of this.state.getWebSockets()) {
+      const { sessionId } = ws.deserializeAttachment();
       if (sessionId !== excludeSessionId) {
         try {
-          session.ws.send(payload);
+          ws.send(payload);
         } catch (error) {
           console.error('[Room] Broadcast error:', error);
         }
