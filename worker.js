@@ -2393,7 +2393,7 @@ function getHTML(env) {
       // Reset receive section to show the join form again
       receiveJoinForm.style.display = '';
       receiveJoinedState.style.display = 'none';
-      leftReceiveState.querySelector('.left-receive-sub').textContent = 'Enter the code from the sender\'s screen';
+      leftReceiveState.querySelector('.left-receive-sub').textContent = "Enter the code from the sender's screen";
       sendRoleBtn.click();
     });
 
