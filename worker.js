@@ -4240,8 +4240,9 @@ function getHTML(env) {
         textItem.getAsString((text) => {
           text = text.trim();
           if (!text) return;
-          const isUrl = /^https?:\/\//i.test(text) ||
-            (/^[^\s]+\.[a-zA-Z]{2,}(\/\S*)?$/.test(text) && !text.includes(' ') && !text.includes('\n'));
+          const lc = text.toLowerCase();
+          const isUrl = lc.startsWith('http://') || lc.startsWith('https://') || lc.startsWith('ftp://') ||
+            (!text.includes(' ') && text.indexOf(String.fromCharCode(10)) === -1 && /[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/.test(text));
           if (isUrl) {
             urlModeBtn.click();
             urlInput.value = text;
