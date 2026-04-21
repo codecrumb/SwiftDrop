@@ -1426,7 +1426,60 @@ function getHTML(env) {
       font-size: 14px;
       transition: color 0.3s ease;
     }
-    
+
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: var(--container-bg);
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    .file-row-name {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: color 0.3s ease;
+    }
+
+    .file-row-size {
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      transition: color 0.3s ease;
+    }
+
+    .file-row-remove {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0 2px;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+
+    .file-row-remove:hover {
+      color: #ef4444;
+    }
+
     .download-area {
       background: #f0fdf4;
       border: 2px solid #86efac;
@@ -2241,8 +2294,9 @@ function getHTML(env) {
       <input type="file" id="fileInput" multiple>
       
       <div class="file-info" id="fileInfo">
-        <div class="file-name" id="fileName"></div>
-        <div class="file-size" id="fileSize"></div>
+        <div class="file-list" id="fileList"></div>
+        <div class="file-name" id="fileName" style="display:none;"></div>
+        <div class="file-size" id="fileSize" style="display:none;"></div>
       </div>
       
       <button class="btn btn-waiting" id="sendBtn" disabled>Waiting for receiver...</button>
@@ -2524,6 +2578,7 @@ function getHTML(env) {
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
     const fileInfo = document.getElementById('fileInfo');
+    const fileList = document.getElementById('fileList');
     const fileNameEl = document.getElementById('fileName');
     const fileSizeEl = document.getElementById('fileSize');
     const sendBtn = document.getElementById('sendBtn');
@@ -2555,6 +2610,32 @@ function getHTML(env) {
     const receiveJoinForm = document.getElementById('receiveJoinForm');
     const receiveJoinedState = document.getElementById('receiveJoinedState');
     const receiveJoinedCode = document.getElementById('receiveJoinedCode');
+
+    // Render the selected files list with individual remove buttons
+    function renderFileList() {
+      fileList.innerHTML = '';
+      if (selectedFiles.length === 0) {
+        fileInfo.style.display = 'none';
+        return;
+      }
+      selectedFiles.forEach((file, i) => {
+        const row = document.createElement('div');
+        row.className = 'file-row';
+        row.innerHTML = \`<span class="file-row-name" title="\${file.name}">\${file.name}</span><span class="file-row-size">\${formatFileSize(file.size)}</span><button class="file-row-remove" data-index="\${i}" title="Remove">×</button>\`;
+        fileList.appendChild(row);
+      });
+      fileInfo.style.display = 'block';
+      fileList.querySelectorAll('.file-row-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedFiles.splice(parseInt(btn.dataset.index), 1);
+          const dt = new DataTransfer();
+          selectedFiles.forEach(f => dt.items.add(f));
+          fileInput.files = dt.files;
+          if (selectedFiles.length === 0) updateSendButton('waiting');
+          renderFileList();
+        });
+      });
+    }
 
     // Switch to receive tab and show "joined" state (hides code entry form)
     function activateReceiveJoined(code) {
@@ -2710,15 +2791,7 @@ function getHTML(env) {
               fileInput.files = dt.files;
             } catch (_) {}
 
-            if (selectedFiles.length === 1) {
-              fileNameEl.textContent = selectedFiles[0].name;
-              fileSizeEl.textContent = formatFileSize(selectedFiles[0].size);
-            } else {
-              const totalBytes = selectedFiles.reduce((s, f) => s + f.size, 0);
-              fileNameEl.textContent = selectedFiles.length + ' files selected';
-              fileSizeEl.textContent = formatFileSize(totalBytes) + ' total';
-            }
-            fileInfo.style.display = 'block';
+            renderFileList();
 
             if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
               updateSendButton('p2p');
@@ -3951,20 +4024,11 @@ function getHTML(env) {
         // Switch to send mode if not already there
         sendModeBtn.click();
 
-        selectedFiles = files;
+        selectedFiles = [...selectedFiles, ...files];
         const dataTransfer = new DataTransfer();
-        files.forEach(f => dataTransfer.items.add(f));
+        selectedFiles.forEach(f => dataTransfer.items.add(f));
         fileInput.files = dataTransfer.files;
-
-        if (selectedFiles.length === 1) {
-          fileNameEl.textContent = selectedFiles[0].name;
-          fileSizeEl.textContent = formatFileSize(selectedFiles[0].size);
-        } else {
-          const total = selectedFiles.reduce((s, f) => s + f.size, 0);
-          fileNameEl.textContent = selectedFiles.length + ' files selected';
-          fileSizeEl.textContent = formatFileSize(total) + ' total';
-        }
-        fileInfo.style.display = 'block';
+        renderFileList();
 
         if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
           updateSendButton('p2p');
@@ -3974,9 +4038,9 @@ function getHTML(env) {
           updateSendButton('waiting');
         }
 
-        showToast(selectedFiles.length === 1
-          ? ('File selected: ' + selectedFiles[0].name)
-          : (selectedFiles.length + ' files selected'));
+        showToast(files.length === 1
+          ? ('Added: ' + files[0].name)
+          : (files.length + ' files added'));
       }
     });
 
@@ -4000,20 +4064,11 @@ function getHTML(env) {
 
       const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
-        selectedFiles = files;
+        selectedFiles = [...selectedFiles, ...files];
         const dataTransfer = new DataTransfer();
-        files.forEach(f => dataTransfer.items.add(f));
+        selectedFiles.forEach(f => dataTransfer.items.add(f));
         fileInput.files = dataTransfer.files;
-
-        if (selectedFiles.length === 1) {
-          fileNameEl.textContent = selectedFiles[0].name;
-          fileSizeEl.textContent = formatFileSize(selectedFiles[0].size);
-        } else {
-          const total = selectedFiles.reduce((s, f) => s + f.size, 0);
-          fileNameEl.textContent = selectedFiles.length + ' files selected';
-          fileSizeEl.textContent = formatFileSize(total) + ' total';
-        }
-        fileInfo.style.display = 'block';
+        renderFileList();
 
         if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
           updateSendButton('p2p');
@@ -4023,26 +4078,17 @@ function getHTML(env) {
           updateSendButton('waiting');
         }
 
-        showToast(selectedFiles.length === 1
-          ? ('File selected: ' + selectedFiles[0].name)
-          : (selectedFiles.length + ' files selected'));
+        showToast(files.length === 1
+          ? ('Added: ' + files[0].name)
+          : (files.length + ' files added'));
       }
     });
     
     fileInput.addEventListener('change', (e) => {
       const files = Array.from(e.target.files);
       if (files.length > 0) {
-        selectedFiles = files;
-
-        if (selectedFiles.length === 1) {
-          fileNameEl.textContent = selectedFiles[0].name;
-          fileSizeEl.textContent = formatFileSize(selectedFiles[0].size);
-        } else {
-          const total = selectedFiles.reduce((s, f) => s + f.size, 0);
-          fileNameEl.textContent = selectedFiles.length + ' files selected';
-          fileSizeEl.textContent = formatFileSize(total) + ' total';
-        }
-        fileInfo.style.display = 'block';
+        selectedFiles = [...selectedFiles, ...files];
+        renderFileList();
 
         if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
           updateSendButton('p2p');
@@ -4151,6 +4197,63 @@ function getHTML(env) {
       const code = roomInput.value.replace(/\D/g, '');
       if (code.length === 6) {
         joinBtn.click();
+      }
+    });
+
+    // Global paste handler: files → File tab, URLs → URL tab, text → Text tab
+    document.addEventListener('paste', (e) => {
+      // Let native paste work in inputs/textareas
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      const items = Array.from(e.clipboardData.items);
+      const fileItems = items.filter(i => i.kind === 'file');
+
+      if (fileItems.length > 0) {
+        e.preventDefault();
+        const files = fileItems.map(i => i.getAsFile()).filter(Boolean);
+        if (files.length === 0) return;
+
+        sendModeBtn.click();
+        selectedFiles = [...selectedFiles, ...files];
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(f => dataTransfer.items.add(f));
+        fileInput.files = dataTransfer.files;
+        renderFileList();
+
+        if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
+          updateSendButton('p2p');
+        } else if (ws && ws.readyState === WebSocket.OPEN) {
+          updateSendButton('connecting');
+        } else {
+          updateSendButton('waiting');
+        }
+
+        showToast(files.length === 1
+          ? ('Added: ' + files[0].name)
+          : (files.length + ' files added'));
+        return;
+      }
+
+      const textItem = items.find(i => i.kind === 'string' && i.type === 'text/plain');
+      if (textItem) {
+        textItem.getAsString((text) => {
+          text = text.trim();
+          if (!text) return;
+          const isUrl = /^https?:\/\//i.test(text) ||
+            (/^[^\s]+\.[a-zA-Z]{2,}(\/\S*)?$/.test(text) && !text.includes(' ') && !text.includes('\n'));
+          if (isUrl) {
+            urlModeBtn.click();
+            urlInput.value = text;
+            urlInput.dispatchEvent(new Event('input'));
+            showToast('URL pasted!');
+          } else {
+            textModeBtn.click();
+            textInput.value = text;
+            textInput.dispatchEvent(new Event('input'));
+            showToast('Text pasted!');
+          }
+        });
       }
     });
   </script>
