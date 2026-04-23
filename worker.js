@@ -3380,6 +3380,7 @@ function getHTML(env) {
     
     function setupDataChannel() {
       dataChannel.binaryType = 'arraybuffer';
+      dataChannel.bufferedAmountLowThreshold = 256 * 1024; // 256KB low-water mark
       
       dataChannel.onopen = () => {
         console.log('✅ Data channel open');
@@ -3551,7 +3552,15 @@ function getHTML(env) {
               : \`Sending... \${Math.round(percent)}%\`;
 
             if (offset < file.size) {
-              readSlice(offset);
+              // Backpressure: pause if the send buffer is above 1MB
+              if (dataChannel.bufferedAmount > 1 * 1024 * 1024) {
+                dataChannel.onbufferedamountlow = () => {
+                  dataChannel.onbufferedamountlow = null;
+                  readSlice(offset);
+                };
+              } else {
+                readSlice(offset);
+              }
             } else {
               resolve();
             }
