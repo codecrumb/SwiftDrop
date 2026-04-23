@@ -581,7 +581,7 @@ function getManifest() {
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+      { src: '/icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
     ],
     share_target: {
       action: '/share',
@@ -698,6 +698,7 @@ async function serveIcon(pathname) {
   const map = {
     '/icons/icon-192.png': 'https://faviconser.pages.dev/swiftdrop/icon-192.png',
     '/icons/icon-512.png': 'https://faviconser.pages.dev/swiftdrop/icon-512.png',
+    '/icons/icon-512-maskable.png': 'https://faviconser.pages.dev/swiftdrop/icon-512-maskable.png',
     '/icons/apple-touch-icon.png': 'https://faviconser.pages.dev/swiftdrop/apple-touch-icon.png',
     '/icons/favicon-16.png': 'https://faviconser.pages.dev/swiftdrop/favicon-16.png',
     '/icons/favicon-32.png': 'https://faviconser.pages.dev/swiftdrop/favicon-32.png',
@@ -713,9 +714,17 @@ async function serveIcon(pathname) {
     return new Response('Icon fetch failed', { status: 502 });
   }
 
+  // faviconser.pages.dev returns a 200 HTML "Page Not Found" body when a file
+  // is missing, which Chrome would then try to decode as a PNG and silently
+  // fall back to a generic icon. Require an image content-type before we echo
+  // the upstream body back.
+  const ct = upstreamRes.headers.get('Content-Type') || '';
+  if (!ct.startsWith('image/')) {
+    return new Response('Upstream icon missing or not an image', { status: 502 });
+  }
+
   const headers = new Headers();
-  const ct = upstreamRes.headers.get('Content-Type');
-  if (ct) headers.set('Content-Type', ct);
+  headers.set('Content-Type', ct);
   headers.set('Cache-Control', 'public, max-age=86400, immutable');
   return new Response(upstreamRes.body, { status: 200, headers });
 }
