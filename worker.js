@@ -1806,6 +1806,29 @@ function getHTML(env) {
       transition: color 0.3s ease;
     }
 
+    .settings-github-row {
+      justify-content: flex-start;
+      display: none;
+    }
+
+    @media (max-width: 400px) {
+      .settings-github-row { display: flex; }
+    }
+
+    .settings-github-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s ease;
+    }
+
+    .settings-github-link:hover {
+      color: var(--text-primary);
+    }
+
     .settings-toggle {
       position: relative;
       display: inline-block;
@@ -2236,6 +2259,10 @@ function getHTML(env) {
       }
 
     }
+
+    @media (max-width: 400px) {
+      .github-link { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -2429,6 +2456,22 @@ function getHTML(env) {
           <span class="settings-toggle-slider"></span>
         </label>
       </div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Keep screen awake during transfers</span>
+          <span class="settings-desc">Prevent the screen from dimming while a file transfer is in progress</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="keepScreenAwakeToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+      <div class="settings-row settings-github-row">
+        <a href="https://github.com/codecrumb/SwiftDrop" target="_blank" rel="noopener" class="settings-github-link">
+          <svg viewBox="0 0 16 16" aria-hidden="true" width="18" height="18" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          View on GitHub
+        </a>
+      </div>
     </div>
   </div>
 
@@ -2495,11 +2538,13 @@ function getHTML(env) {
     const autoCopyToggle = document.getElementById('autoCopyToggle');
     const autoDownloadToggle = document.getElementById('autoDownloadToggle');
     const autoJoinToggle = document.getElementById('autoJoinToggle');
+    const keepScreenAwakeToggle = document.getElementById('keepScreenAwakeToggle');
 
-    // Load saved settings (auto-copy default on, auto-download default off, auto-join default on)
+    // Load saved settings (auto-copy default on, auto-download default off, auto-join default on, keep awake default on)
     autoCopyToggle.checked = localStorage.getItem('autoCopyText') !== 'false';
     autoDownloadToggle.checked = localStorage.getItem('autoDownloadFiles') === 'true';
     autoJoinToggle.checked = localStorage.getItem('autoJoinRoom') !== 'false';
+    keepScreenAwakeToggle.checked = localStorage.getItem('keepScreenAwake') !== 'false';
 
     autoCopyToggle.addEventListener('change', () => {
       localStorage.setItem('autoCopyText', autoCopyToggle.checked ? 'true' : 'false');
@@ -2511,6 +2556,11 @@ function getHTML(env) {
 
     autoJoinToggle.addEventListener('change', () => {
       localStorage.setItem('autoJoinRoom', autoJoinToggle.checked ? 'true' : 'false');
+    });
+
+    keepScreenAwakeToggle.addEventListener('change', () => {
+      localStorage.setItem('keepScreenAwake', keepScreenAwakeToggle.checked ? 'true' : 'false');
+      if (!keepScreenAwakeToggle.checked) releaseWakeLock();
     });
 
     function openSettingsModal() {
@@ -2528,6 +2578,37 @@ function getHTML(env) {
     settingsModal.addEventListener('click', (e) => {
       if (e.target === settingsModal) closeSettingsModal();
     });
+
+    // Wake Lock — prevents screen from dimming during active transfers
+    let wakeLock = null;
+
+    async function acquireWakeLock() {
+      if (!('wakeLock' in navigator)) return;
+      if (localStorage.getItem('keepScreenAwake') === 'false') return;
+      if (wakeLock) return; // already held
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } catch (e) {
+        console.warn('Wake lock request failed:', e);
+      }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    }
+
+    // Re-acquire after tab becomes visible again (wake lock auto-releases on hide)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && transferInProgress) {
+        acquireWakeLock();
+      }
+    });
+
+    let transferInProgress = false;
 
     // Configuration
     const CONFIG = {
@@ -3446,6 +3527,11 @@ function getHTML(env) {
           fileName = data.fileName;
           totalSize = data.fileSize;
 
+          if ((data.fileIndex ?? 0) === 0) {
+            transferInProgress = true;
+            acquireWakeLock();
+          }
+
           statusText.textContent = pendingFileCount > 1
             ? \`Receiving file \${(data.fileIndex ?? 0) + 1}/\${pendingFileCount}...\`
             : 'Receiving file via P2P...';
@@ -3516,6 +3602,8 @@ function getHTML(env) {
     async function sendFileP2P() {
       sendBtn.disabled = true;
       progress.style.display = 'block';
+      transferInProgress = true;
+      await acquireWakeLock();
 
       const totalBytes = selectedFiles.reduce((s, f) => s + f.size, 0);
 
@@ -3575,6 +3663,8 @@ function getHTML(env) {
         });
       }
 
+      transferInProgress = false;
+      releaseWakeLock();
       progressText.textContent = '✅ Transfer complete!';
       showToast(selectedFiles.length === 1 ? 'File sent successfully!' : \`\${selectedFiles.length} files sent!\`);
       telehostPromo.style.display = 'block';
@@ -3598,6 +3688,8 @@ function getHTML(env) {
 
         sendBtn.disabled = true;
         progress.style.display = 'block';
+        transferInProgress = true;
+        await acquireWakeLock();
 
         for (let i = 0; i < selectedFiles.length; i++) {
           const file = selectedFiles[i];
@@ -3662,6 +3754,8 @@ function getHTML(env) {
           }
         }
 
+        transferInProgress = false;
+        releaseWakeLock();
         progressText.textContent = '✅ Uploaded! Links sent.';
         showToast(selectedFiles.length === 1 ? 'File uploaded! Link sent to receiver.' : \`\${selectedFiles.length} files uploaded!\`);
 
@@ -3683,12 +3777,14 @@ function getHTML(env) {
           errorMessage = 'Upload failed. Please check your connection and try again.';
         }
 
+        transferInProgress = false;
+        releaseWakeLock();
         showError(errorMessage);
         sendBtn.disabled = false;
         progress.style.display = 'none';
       }
     }
-    
+
     function handleFallbackLink(data) {
       const totalInBatch = data.fileCount ?? 1;
       if ((data.fileIndex ?? 0) === 0 || receivedFiles.length === 0) {
@@ -3777,6 +3873,8 @@ function getHTML(env) {
       receivedSize = 0;
 
       if (receivedFileCount >= pendingFileCount) {
+        transferInProgress = false;
+        releaseWakeLock();
         statusText.textContent = receivedFiles.length === 1 ? '✅ File ready!' : '✅ All files ready!';
         showToast(receivedFiles.length === 1 ? 'File received!' : \`\${receivedFiles.length} files received!\`);
         showReceiveSuccess('files', receivedFiles);
