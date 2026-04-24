@@ -2610,6 +2610,12 @@ function getHTML(env) {
 
     let transferInProgress = false;
 
+    window.addEventListener('beforeunload', (e) => {
+      if (transferInProgress) {
+        e.preventDefault();
+      }
+    });
+
     // Configuration
     const CONFIG = {
       iceServers: [
