@@ -2030,6 +2030,21 @@ function getHTML(env) {
     .nearby-identity-name {
       font-weight: 600;
       color: var(--text-primary);
+      cursor: pointer;
+      border-bottom: 1px dashed var(--border-color);
+    }
+    .nearby-identity-name:hover { border-bottom-color: var(--text-secondary); }
+    .nearby-identity-input {
+      font-weight: 600;
+      font-size: 13px;
+      border: none;
+      border-bottom: 2px solid #667eea;
+      background: transparent;
+      color: var(--text-primary);
+      outline: none;
+      width: 140px;
+      padding: 0;
+      margin: 0;
     }
     .nearby-peer-list {
       display: flex;
@@ -2664,7 +2679,8 @@ function getHTML(env) {
       <input type="file" id="nearbyFileInput" style="display:none;">
       <div class="nearby-identity-row">
         <span class="nearby-identity-label">You appear as:</span>
-        <span class="nearby-identity-name" id="nearbyIdentityName"></span>
+        <span class="nearby-identity-name" id="nearbyIdentityName" title="Tap to rename"></span>
+        <input type="text" id="nearbyIdentityInput" class="nearby-identity-input" maxlength="30" style="display:none;">
       </div>
       <div class="nearby-peer-list" id="nearbyPeerList">
         <div class="nearby-empty" id="nearbyEmpty">
@@ -4608,6 +4624,7 @@ function getHTML(env) {
     const nearbyRoleBtn = document.getElementById('nearbyRoleBtn');
     const nearbySection = document.getElementById('nearbySection');
     const nearbyIdentityName = document.getElementById('nearbyIdentityName');
+    const nearbyIdentityInput = document.getElementById('nearbyIdentityInput');
     const nearbyPeerList = document.getElementById('nearbyPeerList');
     const nearbyEmpty = document.getElementById('nearbyEmpty');
 
@@ -4658,6 +4675,41 @@ function getHTML(env) {
 
     // Init: show/hide Nearby tab based on saved setting
     nearbyUpdateTabVisibility();
+
+    // ── Nearby: Inline Name Edit ──────────────────────────────────────────
+    function nearbyBeginRename() {
+      nearbyIdentityInput.value = nearbyGetIdentity().displayName;
+      nearbyIdentityName.style.display = 'none';
+      nearbyIdentityInput.style.display = '';
+      nearbyIdentityInput.focus();
+      nearbyIdentityInput.select();
+    }
+
+    function nearbyCommitRename() {
+      const newName = nearbyIdentityInput.value.trim();
+      if (newName) {
+        nearbySetDisplayName(newName);
+        if (nearbyWs && nearbyWs.readyState === WebSocket.OPEN) {
+          nearbyWs.send(JSON.stringify({ type: 'update-name', displayName: newName }));
+        }
+        // Keep settings UI in sync
+        const settingsDisplay = document.getElementById('nearbyNameDisplay');
+        if (settingsDisplay) settingsDisplay.textContent = newName;
+      }
+      nearbyIdentityName.textContent = nearbyGetIdentity().displayName;
+      nearbyIdentityInput.style.display = 'none';
+      nearbyIdentityName.style.display = '';
+    }
+
+    nearbyIdentityName.addEventListener('click', nearbyBeginRename);
+    nearbyIdentityInput.addEventListener('blur', nearbyCommitRename);
+    nearbyIdentityInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') nearbyIdentityInput.blur();
+      if (e.key === 'Escape') {
+        nearbyIdentityInput.value = nearbyGetIdentity().displayName;
+        nearbyIdentityInput.blur();
+      }
+    });
     // ─────────────────────────────────────────────────────────────────────
 
     // ── NearbyLobby WebSocket Client ──────────────────────────────────────
