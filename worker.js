@@ -2660,6 +2660,7 @@ function getHTML(env) {
 
     <!-- Nearby Mode -->
     <div class="section" id="nearbySection">
+      <input type="file" id="nearbyFileInput" style="display:none;">
       <div class="nearby-identity-row">
         <span class="nearby-identity-label">You appear as:</span>
         <span class="nearby-identity-name" id="nearbyIdentityName"></span>
@@ -2671,7 +2672,6 @@ function getHTML(env) {
           <div style="font-size:13px; color:var(--text-secondary);">Other devices on this network will appear here</div>
         </div>
       </div>
-      <p class="nearby-hint" id="nearbyHint" style="display:none;">Select a file in <strong>Send</strong> tab first, then tap a device</p>
     </div>
 
     <!-- Receive Mode -->
@@ -4609,7 +4609,6 @@ function getHTML(env) {
     const nearbyIdentityName = document.getElementById('nearbyIdentityName');
     const nearbyPeerList = document.getElementById('nearbyPeerList');
     const nearbyEmpty = document.getElementById('nearbyEmpty');
-    const nearbyHint = document.getElementById('nearbyHint');
 
     function nearbyUpdateTabVisibility() {
       nearbyRoleBtn.style.display = nearbyIsEnabled() ? '' : 'none';
@@ -4649,14 +4648,7 @@ function getHTML(env) {
         leftReceiveState.style.display = 'none';
         roleHint.textContent = 'Tap a device to send';
         nearbyIdentityName.textContent = nearbyGetIdentity().displayName;
-        nearbyUpdateHint();
       }
-    }
-
-    function nearbyUpdateHint() {
-      const fileList = document.getElementById('fileList');
-      const hasFile = fileList && fileList.children.length > 0;
-      nearbyHint.style.display = hasFile ? 'none' : '';
     }
 
     nearbyRoleBtn.addEventListener('click', () => switchToRole('nearby'));
@@ -4801,18 +4793,31 @@ function getHTML(env) {
     let nearbySendTargetDeviceId = null;
     let nearbySendFile = null;
     let nearbyLastTransferPeer = null; // { deviceId, displayName }
+    let nearbyPendingPeer = null; // peer waiting for file selection
 
+    const nearbyFileInput = document.getElementById('nearbyFileInput');
+
+    // Tap a device → open file picker, send request once file chosen
     function nearbyInitiateSend(peer) {
-      const fileInput = document.getElementById('fileInput');
-      const files = fileInput ? fileInput.files : null;
-      if (!files || files.length === 0) {
-        switchToRole('send');
-        showToast('Select a file first, then come back to Nearby');
-        return;
-      }
-      const file = files[0]; // v1: single file
+      nearbyPendingPeer = peer;
+      nearbyFileInput.value = ''; // reset so same file can be re-selected
+      nearbyFileInput.click();
+    }
+
+    nearbyFileInput.addEventListener('change', () => {
+      const file = nearbyFileInput.files[0];
+      if (!file || !nearbyPendingPeer) return;
+
+      const peer = nearbyPendingPeer;
+      nearbyPendingPeer = null;
       nearbySendTargetDeviceId = peer.deviceId;
       nearbySendFile = file;
+
+      // Populate selectedFiles so the existing sendFile() logic picks it up
+      selectedFiles = [file];
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      document.getElementById('fileInput').files = dt.files;
 
       // Update peer item to show "Waiting…"
       const item = nearbyPeerList.querySelector(\`[data-device-id="\${peer.deviceId}"]\`);
@@ -4824,7 +4829,7 @@ function getHTML(env) {
         fileName: file.name,
         fileSize: file.size,
       }));
-    }
+    });
 
     function nearbySenderJoinRoom(roomCode) {
       if (!nearbySendFile) return;
