@@ -2676,7 +2676,6 @@ function getHTML(env) {
 
     <!-- Nearby Mode -->
     <div class="section" id="nearbySection">
-      <input type="file" id="nearbyFileInput" style="display:none;">
       <div class="nearby-identity-row">
         <span class="nearby-identity-label">You appear as:</span>
         <span class="nearby-identity-name" id="nearbyIdentityName" title="Tap to rename"></span>
@@ -4017,8 +4016,13 @@ function getHTML(env) {
 
           // Nearby: auto-send if triggered from Nearby tab
           if (nearbyAutoSendPending) {
-            nearbyAutoSendPending = false;
-            setTimeout(() => sendFile(), 100);
+            const type = nearbyAutoSendPending;
+            nearbyAutoSendPending = null;
+            setTimeout(() => {
+              if (type === 'file') sendFile();
+              else if (type === 'url') sendUrl();
+              else if (type === 'text') sendText();
+            }, 100);
           }
         }
       };
@@ -4639,6 +4643,11 @@ function getHTML(env) {
       [sendRoleBtn, receiveRoleBtn, nearbyRoleBtn].forEach(b => b.classList.remove('active'));
       nearbySection.classList.remove('active');
 
+      // Restore send buttons whenever leaving Nearby mode
+      sendBtn.style.display = '';
+      sendUrlBtn.style.display = '';
+      sendTextBtn.style.display = '';
+
       if (role === 'send') {
         lastSendTypeBtn.click();
       } else if (role === 'receive') {
@@ -4656,17 +4665,29 @@ function getHTML(env) {
       } else if (role === 'nearby') {
         nearbyRoleBtn.classList.add('active');
         nearbySection.classList.add('active');
-        sendTypeSelector.style.display = 'none';
+        // Show the send-type selector and whichever sub-section was last active
+        sendTypeSelector.style.display = '';
         receiveSection.classList.remove('active');
-        sendSection.classList.remove('active');
-        urlSection.classList.remove('active');
-        textSection.classList.remove('active');
+        // Re-activate the last send sub-section (sendSection/urlSection/textSection)
+        // so drag-drop, paste, and file input all work inside Nearby
+        lastSendTypeBtn.click(); // this also sets the right section active
+        // But override the role-button state that lastSendTypeBtn.click() sets
+        [sendRoleBtn, receiveRoleBtn, nearbyRoleBtn].forEach(b => b.classList.remove('active'));
+        nearbyRoleBtn.classList.add('active');
+        // Hide the "Waiting for receiver…" action buttons — tap-to-send replaces them
+        sendBtn.style.display = 'none';
+        sendUrlBtn.style.display = 'none';
+        sendTextBtn.style.display = 'none';
         status.style.display = 'none';
         qrInlineWrapper.style.display = 'none';
         leftReceiveState.style.display = 'none';
-        roleHint.textContent = 'Tap a device to send';
+        roleHint.textContent = 'Pick content above, then tap a device';
         nearbyIdentityName.textContent = nearbyGetIdentity().displayName;
       }
+    }
+
+    function nearbyIsActive() {
+      return nearbySection.classList.contains('active');
     }
 
     nearbyRoleBtn.addEventListener('click', () => switchToRole('nearby'));
@@ -4844,33 +4865,48 @@ function getHTML(env) {
 
     // ── Nearby: Sender Side ───────────────────────────────────────────────
     let nearbySendTargetDeviceId = null;
-    let nearbySendFile = null;
+    let nearbyContentType = null; // 'file' | 'url' | 'text'
     let nearbyLastTransferPeer = null; // { deviceId, displayName }
-    let nearbyPendingPeer = null; // peer waiting for file selection
+    // (nearbySendFile removed — content lives in selectedFiles/urlInput/textInput)
 
-    const nearbyFileInput = document.getElementById('nearbyFileInput');
-
-    // Tap a device → open file picker, send request once file chosen
+    // Tap a device → check what content is ready and send it
     function nearbyInitiateSend(peer) {
-      nearbyPendingPeer = peer;
-      nearbyFileInput.value = ''; // reset so same file can be re-selected
-      nearbyFileInput.click();
-    }
+      // Determine active content type and validate content exists
+      let contentType, fileName, fileSize;
 
-    nearbyFileInput.addEventListener('change', () => {
-      const file = nearbyFileInput.files[0];
-      if (!file || !nearbyPendingPeer) return;
+      if (sendSection.classList.contains('active')) {
+        if (!selectedFiles.length) {
+          showToast('Pick a file above first');
+          return;
+        }
+        contentType = 'file';
+        fileName = selectedFiles.length === 1
+          ? selectedFiles[0].name
+          : \`\${selectedFiles.length} files\`;
+        fileSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+      } else if (urlSection.classList.contains('active')) {
+        if (!urlInput.value.trim()) {
+          showToast('Enter a URL above first');
+          return;
+        }
+        contentType = 'url';
+        fileName = urlInput.value.trim();
+        fileSize = 0;
+      } else if (textSection.classList.contains('active')) {
+        if (!textInput.value.trim()) {
+          showToast('Enter some text above first');
+          return;
+        }
+        contentType = 'text';
+        fileName = 'Text snippet';
+        fileSize = new Blob([textInput.value]).size;
+      } else {
+        showToast('Pick content above first');
+        return;
+      }
 
-      const peer = nearbyPendingPeer;
-      nearbyPendingPeer = null;
       nearbySendTargetDeviceId = peer.deviceId;
-      nearbySendFile = file;
-
-      // Populate selectedFiles so the existing sendFile() logic picks it up
-      selectedFiles = [file];
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      document.getElementById('fileInput').files = dt.files;
+      nearbyContentType = contentType;
 
       // Update peer item to show "Waiting…"
       const item = nearbyPeerList.querySelector(\`[data-device-id="\${peer.deviceId}"]\`);
@@ -4879,24 +4915,25 @@ function getHTML(env) {
       nearbyWs.send(JSON.stringify({
         type: 'send-request',
         targetDeviceId: peer.deviceId,
-        fileName: file.name,
-        fileSize: file.size,
+        fileName,
+        fileSize,
       }));
-    });
+    }
 
     function nearbySenderJoinRoom(roomCode) {
-      if (!nearbySendFile) return;
+      if (!nearbyContentType) return;
       const peer = nearbyPeers.find(p => p.deviceId === nearbySendTargetDeviceId);
       if (peer) nearbyLastTransferPeer = { deviceId: peer.deviceId, displayName: peer.displayName };
-      switchToRole('send');
-      nearbyTriggerSend(roomCode, nearbySendFile);
+      const type = nearbyContentType;
       nearbySendTargetDeviceId = null;
-      nearbySendFile = null;
+      nearbyContentType = null;
+      switchToRole('send');
+      nearbyTriggerSend(roomCode, type);
     }
 
     function nearbyClosePendingRequest() {
       nearbySendTargetDeviceId = null;
-      nearbySendFile = null;
+      nearbyContentType = null;
       nearbyRenderPeers();
     }
     // ─────────────────────────────────────────────────────────────────────
@@ -4962,10 +4999,10 @@ function getHTML(env) {
     // ─────────────────────────────────────────────────────────────────────
 
     // ── Nearby: Transfer Handoff ──────────────────────────────────────────
-    let nearbyAutoSendPending = false;
+    let nearbyAutoSendPending = null; // null | 'file' | 'url' | 'text'
 
-    function nearbyTriggerSend(roomCode, file) {
-      // File is already in selectedFiles (user picked it before tapping nearby device)
+    function nearbyTriggerSend(roomCode, contentType) {
+      // Content is already prepared in selectedFiles / urlInput / textInput
       // Close existing signaling connection and join as sender with the given room code
       isSender = true;
       if (ws) {
@@ -4977,7 +5014,7 @@ function getHTML(env) {
       generateQRCode(roomCode);
       connectWebSocket(roomCode);
       status.classList.add('clickable');
-      nearbyAutoSendPending = true;
+      nearbyAutoSendPending = contentType;
     }
 
     function nearbyReceiverJoinRoom(roomCode) {
@@ -5008,7 +5045,7 @@ function getHTML(env) {
     // ─────────────────────────────────────────────────────────────────────
 
     sendModeBtn.addEventListener('click', () => {
-      activateSendRole();
+      if (!nearbyIsActive()) activateSendRole();
       lastSendTypeBtn = sendModeBtn;
       sendModeBtn.classList.add('active');
       urlModeBtn.classList.remove('active');
@@ -5016,10 +5053,11 @@ function getHTML(env) {
       sendSection.classList.add('active');
       urlSection.classList.remove('active');
       textSection.classList.remove('active');
+      if (nearbyIsActive()) { sendBtn.style.display = 'none'; }
     });
 
     urlModeBtn.addEventListener('click', () => {
-      activateSendRole();
+      if (!nearbyIsActive()) activateSendRole();
       lastSendTypeBtn = urlModeBtn;
       urlModeBtn.classList.add('active');
       sendModeBtn.classList.remove('active');
@@ -5027,10 +5065,11 @@ function getHTML(env) {
       urlSection.classList.add('active');
       sendSection.classList.remove('active');
       textSection.classList.remove('active');
+      if (nearbyIsActive()) { sendUrlBtn.style.display = 'none'; }
     });
 
     textModeBtn.addEventListener('click', () => {
-      activateSendRole();
+      if (!nearbyIsActive()) activateSendRole();
       lastSendTypeBtn = textModeBtn;
       textModeBtn.classList.add('active');
       sendModeBtn.classList.remove('active');
@@ -5039,6 +5078,7 @@ function getHTML(env) {
       sendSection.classList.remove('active');
       urlSection.classList.remove('active');
       textInput.focus();
+      if (nearbyIsActive()) { sendTextBtn.style.display = 'none'; }
     });
     
     // File selection - click
