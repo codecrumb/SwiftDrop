@@ -2658,6 +2658,77 @@ function getHTML(env) {
   </div>
 
   <script>
+    // ── Nearby: Device Identity ──────────────────────────────────────────
+    const NEARBY_ADJECTIVES = [
+      'Swift','Quick','Bright','Cool','Bold','Calm','Keen','Wise','Fast','Smart',
+      'Sharp','Brave','Steady','Quiet','Lively','Merry','Nimble','Jolly','Proud','Vivid'
+    ];
+    const NEARBY_ANIMALS = [
+      'Penguin','Otter','Fox','Hawk','Wolf','Bear','Eagle','Tiger','Lion','Panda',
+      'Rabbit','Falcon','Jaguar','Lynx','Moose','Raven','Seal','Whale','Zebra','Crane'
+    ];
+
+    function nearbyGenerateName() {
+      const adj = NEARBY_ADJECTIVES[Math.floor(Math.random() * NEARBY_ADJECTIVES.length)];
+      const animal = NEARBY_ANIMALS[Math.floor(Math.random() * NEARBY_ANIMALS.length)];
+      return \`\${adj} \${animal}\`;
+    }
+
+    function nearbyGetIdentity() {
+      let deviceId = localStorage.getItem('nearbyDeviceId');
+      let displayName = localStorage.getItem('nearbyDisplayName');
+      if (!deviceId) {
+        deviceId = crypto.randomUUID();
+        localStorage.setItem('nearbyDeviceId', deviceId);
+      }
+      if (!displayName) {
+        displayName = nearbyGenerateName();
+        localStorage.setItem('nearbyDisplayName', displayName);
+      }
+      return { deviceId, displayName };
+    }
+
+    function nearbySetDisplayName(name) {
+      localStorage.setItem('nearbyDisplayName', name);
+    }
+
+    function nearbyIsEnabled() {
+      return localStorage.getItem('nearbyEnabled') === 'true';
+    }
+
+    function nearbySetEnabled(val) {
+      localStorage.setItem('nearbyEnabled', val ? 'true' : 'false');
+    }
+
+    // ── Nearby: Trusted Devices ──────────────────────────────────────────
+    const NEARBY_TRUST_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+    function nearbyGetTrusted() {
+      try {
+        const raw = localStorage.getItem('nearbyTrusted');
+        if (!raw) return [];
+        const all = JSON.parse(raw);
+        const now = Date.now();
+        return all.filter(t => now - t.trustedAt < NEARBY_TRUST_MS);
+      } catch { return []; }
+    }
+
+    function nearbyIsTrusted(deviceId) {
+      return nearbyGetTrusted().some(t => t.deviceId === deviceId);
+    }
+
+    function nearbyTrustDevice(deviceId, displayName) {
+      const existing = nearbyGetTrusted().filter(t => t.deviceId !== deviceId);
+      existing.push({ deviceId, displayName, trustedAt: Date.now() });
+      localStorage.setItem('nearbyTrusted', JSON.stringify(existing));
+    }
+
+    function nearbyRevokeTrust(deviceId) {
+      const updated = nearbyGetTrusted().filter(t => t.deviceId !== deviceId);
+      localStorage.setItem('nearbyTrusted', JSON.stringify(updated));
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     // Dark Mode
     const darkModeToggle = document.getElementById('darkModeToggle');
     const savedTheme = localStorage.getItem('theme');
