@@ -14,10 +14,18 @@ class_name = "SignalingRoom"
 binding = "FILE_STORAGE"
 bucket_name = "swiftdrop"
 
+[[durable_objects.bindings]]
+name = "NEARBY"
+class_name = "NearbyLobby"
+
 # Durable Object migrations
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["SignalingRoom"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["NearbyLobby"]
 
 # Scheduled cleanup (runs every 5 minutes)
 [triggers]
