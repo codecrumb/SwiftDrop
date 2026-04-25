@@ -26,3 +26,4 @@ thumbs.db
 *.iml
 *.class
 wrangler.toml.local
+.worktrees/
