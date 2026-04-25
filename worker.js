@@ -931,6 +931,150 @@ export class SignalingRoom {
 }
 
 /**
+ * Durable Object: NearbyLobby
+ * Groups devices by public IP and manages presence + transfer handshake.
+ * Keyed by IP address — all devices at the same IP share one instance.
+ */
+export class NearbyLobby {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request) {
+    const upgradeHeader = request.headers.get('Upgrade');
+    if (!upgradeHeader || upgradeHeader !== 'websocket') {
+      return new Response('Expected WebSocket', { status: 426 });
+    }
+
+    const webSocketPair = new WebSocketPair();
+    const [client, server] = Object.values(webSocketPair);
+
+    const sessionId = crypto.randomUUID();
+    // Store sessionId only at connect time; deviceId added on 'announce'
+    server.serializeAttachment({ sessionId, deviceId: null, displayName: null });
+    this.state.acceptWebSocket(server, [sessionId]);
+
+    await this.state.storage.deleteAlarm();
+
+    server.send(JSON.stringify({ type: 'connected', sessionId }));
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  webSocketMessage(ws, message) {
+    try {
+      const data = JSON.parse(message);
+      this.handleMessage(ws, data);
+    } catch (e) {
+      console.error('[Nearby] Invalid message:', e);
+    }
+  }
+
+  async webSocketClose(ws) {
+    const { sessionId, displayName } = ws.deserializeAttachment();
+    console.log(`[Nearby] Peer left: ${displayName || sessionId}`);
+    // Broadcast updated list after a tick so this socket is removed
+    setTimeout(() => this.broadcastPeerList(), 0);
+    const remaining = this.state.getWebSockets().length - 1;
+    if (remaining === 0) {
+      await this.state.storage.setAlarm(Date.now() + 5 * 60 * 1000);
+    }
+  }
+
+  webSocketError(ws, error) {
+    console.error('[Nearby] WebSocket error:', error);
+  }
+
+  handleMessage(ws, data) {
+    const attachment = ws.deserializeAttachment();
+
+    switch (data.type) {
+      case 'announce': {
+        // Register device identity on this socket
+        ws.serializeAttachment({
+          ...attachment,
+          deviceId: data.deviceId,
+          displayName: data.displayName,
+        });
+        console.log(`[Nearby] Announced: ${data.displayName} (${data.deviceId.slice(0, 8)})`);
+        this.broadcastPeerList();
+        break;
+      }
+
+      case 'update-name': {
+        ws.serializeAttachment({ ...attachment, displayName: data.displayName });
+        this.broadcastPeerList();
+        break;
+      }
+
+      case 'send-request': {
+        const targetWs = this.findByDeviceId(data.targetDeviceId);
+        if (!targetWs) return;
+        const { deviceId: fromId, displayName: fromName } = ws.deserializeAttachment();
+        targetWs.send(JSON.stringify({
+          type: 'send-request',
+          fromDeviceId: fromId,
+          fromName,
+          fileName: data.fileName,
+          fileSize: data.fileSize,
+        }));
+        break;
+      }
+
+      case 'send-response': {
+        const senderWs = this.findByDeviceId(data.targetDeviceId);
+        if (!senderWs) return;
+        if (data.accepted) {
+          senderWs.send(JSON.stringify({ type: 'send-accepted', roomCode: data.roomCode }));
+        } else {
+          senderWs.send(JSON.stringify({ type: 'send-declined' }));
+        }
+        break;
+      }
+
+      case 'ping':
+        ws.send(JSON.stringify({ type: 'pong' }));
+        break;
+
+      default:
+        console.log(`[Nearby] Unknown message type: ${data.type}`);
+    }
+  }
+
+  broadcastPeerList() {
+    const allSockets = this.state.getWebSockets();
+    for (const ws of allSockets) {
+      const { deviceId: selfId } = ws.deserializeAttachment();
+      if (!selfId) continue; // not yet announced
+      const peers = allSockets
+        .map(s => s.deserializeAttachment())
+        .filter(a => a.deviceId && a.deviceId !== selfId)
+        .map(a => ({ deviceId: a.deviceId, displayName: a.displayName }));
+      try {
+        ws.send(JSON.stringify({ type: 'peer-list', peers }));
+      } catch (e) {
+        console.error('[Nearby] broadcastPeerList error:', e);
+      }
+    }
+  }
+
+  findByDeviceId(deviceId) {
+    for (const ws of this.state.getWebSockets()) {
+      const { deviceId: id } = ws.deserializeAttachment();
+      if (id === deviceId) return ws;
+    }
+    return null;
+  }
+
+  async alarm() {
+    const peers = this.state.getWebSockets();
+    if (peers.length > 0) return;
+    console.log('[Nearby] Alarm fired: lobby empty, DO will evict.');
+  }
+}
+
+/**
  * HTML UI for SwiftDrop
  * Preserves existing design, adds WebRTC + R2 fallback logic
  */
