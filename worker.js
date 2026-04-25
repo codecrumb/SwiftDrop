@@ -2893,6 +2893,80 @@ function getHTML(env) {
       if (e.target === settingsModal) closeSettingsModal();
     });
 
+    // ── Nearby Settings JS ───────────────────────────────────────────────
+    const nearbyEnabledToggle = document.getElementById('nearbyEnabledToggle');
+    const nearbySettingsExpanded = document.getElementById('nearbySettingsExpanded');
+    const nearbyNameDisplay = document.getElementById('nearbyNameDisplay');
+    const nearbyEditNameBtn = document.getElementById('nearbyEditNameBtn');
+    const nearbyNameInputRow = document.getElementById('nearbyNameInputRow');
+    const nearbyNameInput = document.getElementById('nearbyNameInput');
+    const nearbyNameSaveBtn = document.getElementById('nearbyNameSaveBtn');
+    const nearbyTrustedHeader = document.getElementById('nearbyTrustedHeader');
+    const nearbyTrustedList = document.getElementById('nearbyTrustedList');
+
+    function nearbyRefreshSettingsUI() {
+      const { displayName } = nearbyGetIdentity();
+      nearbyNameDisplay.textContent = displayName;
+      nearbyEnabledToggle.checked = nearbyIsEnabled();
+      nearbySettingsExpanded.style.display = nearbyIsEnabled() ? 'block' : 'none';
+      nearbyRenderTrustedList();
+    }
+
+    function nearbyRenderTrustedList() {
+      const trusted = nearbyGetTrusted();
+      nearbyTrustedHeader.style.display = trusted.length > 0 ? 'flex' : 'none';
+      nearbyTrustedList.innerHTML = '';
+      for (const t of trusted) {
+        const item = document.createElement('div');
+        item.className = 'nearby-trusted-item';
+        const daysAgo = Math.floor((Date.now() - t.trustedAt) / 86400000);
+        item.innerHTML = \`
+          <span>\${t.displayName} <span style="color:var(--text-secondary);font-size:12px;">· trusted \${daysAgo === 0 ? 'today' : daysAgo + 'd ago'}</span></span>
+          <button class="nearby-trusted-remove" data-id="\${t.deviceId}">Remove</button>
+        \`;
+        item.querySelector('button').addEventListener('click', () => {
+          nearbyRevokeTrust(t.deviceId);
+          nearbyRenderTrustedList();
+        });
+        nearbyTrustedList.appendChild(item);
+      }
+    }
+
+    nearbyEnabledToggle.addEventListener('change', () => {
+      nearbySetEnabled(nearbyEnabledToggle.checked);
+      nearbySettingsExpanded.style.display = nearbyEnabledToggle.checked ? 'block' : 'none';
+      nearbyUpdateTabVisibility();
+      if (nearbyEnabledToggle.checked) {
+        nearbyConnect();
+      } else {
+        nearbyDisconnect();
+      }
+    });
+
+    nearbyEditNameBtn.addEventListener('click', () => {
+      nearbyNameInput.value = nearbyGetIdentity().displayName;
+      nearbyNameInputRow.style.display = 'flex';
+      nearbyEditNameBtn.style.display = 'none';
+      nearbyNameInput.focus();
+    });
+
+    nearbyNameSaveBtn.addEventListener('click', () => {
+      const newName = nearbyNameInput.value.trim();
+      if (!newName) return;
+      nearbySetDisplayName(newName);
+      nearbyNameDisplay.textContent = newName;
+      nearbyNameInputRow.style.display = 'none';
+      nearbyEditNameBtn.style.display = '';
+      // Notify lobby of name change
+      if (nearbyWs && nearbyWs.readyState === WebSocket.OPEN) {
+        nearbyWs.send(JSON.stringify({ type: 'update-name', displayName: newName }));
+      }
+    });
+
+    // Refresh settings UI each time the modal opens
+    settingsBtn.addEventListener('click', nearbyRefreshSettingsUI);
+    // ─────────────────────────────────────────────────────────────────────
+
     // Wake Lock — prevents screen from dimming during active transfers
     let wakeLock = null;
 
