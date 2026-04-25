@@ -4655,6 +4655,101 @@ function getHTML(env) {
     nearbyUpdateTabVisibility();
     // ─────────────────────────────────────────────────────────────────────
 
+    // ── NearbyLobby WebSocket Client ──────────────────────────────────────
+    let nearbyWs = null;
+    let nearbyPeers = []; // [{ deviceId, displayName }]
+
+    function nearbyConnect() {
+      if (!nearbyIsEnabled()) return;
+      if (nearbyWs && nearbyWs.readyState <= WebSocket.OPEN) return;
+
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      nearbyWs = new WebSocket(\`\${proto}://\${location.host}/nearby\`);
+
+      nearbyWs.addEventListener('open', () => {
+        console.log('[Nearby] Connected to lobby');
+        const { deviceId, displayName } = nearbyGetIdentity();
+        nearbyWs.send(JSON.stringify({ type: 'announce', deviceId, displayName }));
+        nearbyStartPing();
+      });
+
+      nearbyWs.addEventListener('message', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          nearbyHandleMessage(data);
+        } catch (err) {
+          console.error('[Nearby] Bad message:', err);
+        }
+      });
+
+      nearbyWs.addEventListener('close', () => {
+        console.log('[Nearby] Disconnected');
+        nearbyPeers = [];
+        nearbyRenderPeers();
+        // Reconnect after 3s if still enabled
+        if (nearbyIsEnabled()) setTimeout(nearbyConnect, 3000);
+      });
+
+      nearbyWs.addEventListener('error', () => {
+        console.error('[Nearby] WebSocket error');
+      });
+    }
+
+    function nearbyDisconnect() {
+      if (nearbyWs) {
+        nearbyWs.close();
+        nearbyWs = null;
+      }
+      nearbyPeers = [];
+      nearbyRenderPeers();
+    }
+
+    let nearbyPingInterval = null;
+    function nearbyStartPing() {
+      clearInterval(nearbyPingInterval);
+      nearbyPingInterval = setInterval(() => {
+        if (nearbyWs && nearbyWs.readyState === WebSocket.OPEN) {
+          nearbyWs.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 25000);
+    }
+
+    // Reconnect when tab regains focus
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && nearbyIsEnabled()) {
+        nearbyConnect();
+      }
+    });
+
+    // Auto-connect on load if enabled
+    if (nearbyIsEnabled()) nearbyConnect();
+    // ─────────────────────────────────────────────────────────────────────
+
+    // ── Nearby Peer Rendering ─────────────────────────────────────────────
+    function nearbyRenderPeers() {
+      nearbyPeerList.innerHTML = '';
+      if (nearbyPeers.length === 0) {
+        nearbyPeerList.appendChild(nearbyEmpty);
+        return;
+      }
+      for (const peer of nearbyPeers) {
+        const trusted = nearbyIsTrusted(peer.deviceId);
+        const item = document.createElement('div');
+        item.className = 'nearby-peer-item';
+        item.dataset.deviceId = peer.deviceId;
+        item.innerHTML = \`
+          <div>
+            <span class="nearby-peer-name">\${peer.displayName}</span>
+            \${trusted ? '<span class="nearby-peer-trusted">✓ Trusted</span>' : ''}
+          </div>
+          <span class="nearby-peer-status">Tap to send</span>
+        \`;
+        item.addEventListener('click', () => nearbyInitiateSend(peer));
+        nearbyPeerList.appendChild(item);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     sendModeBtn.addEventListener('click', () => {
       activateSendRole();
       lastSendTypeBtn = sendModeBtn;
