@@ -2056,6 +2056,7 @@ function getHTML(env) {
     .nearby-peer-name {
       font-weight: 600;
       font-size: 15px;
+      color: var(--text-primary);
     }
     .nearby-peer-trusted {
       font-size: 11px;
