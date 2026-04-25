@@ -126,7 +126,18 @@ export default {
       // Forward WebSocket connection to the Durable Object
       return room.fetch(request);
     }
-    
+
+    // Nearby discovery — WebSocket connection to NearbyLobby
+    if (url.pathname === '/nearby') {
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected WebSocket', { status: 426 });
+      }
+      const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const id = env.NEARBY.idFromName(`lobby:${clientIp}`);
+      const lobby = env.NEARBY.get(id);
+      return lobby.fetch(request);
+    }
+
     // R2 Fallback: Upload file or URL
     if (url.pathname === '/upload' && request.method === 'POST') {
       try {
