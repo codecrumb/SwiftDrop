@@ -3343,6 +3343,12 @@ function getHTML(env) {
 
       telehostPromo.style.display = 'block';
       receiveSuccessPanel.classList.add('active');
+
+      // Nearby: offer to trust the sender after a successful transfer
+      if (nearbyLastTransferPeer) {
+        nearbyOfferTrust(nearbyLastTransferPeer.deviceId, nearbyLastTransferPeer.displayName);
+        nearbyLastTransferPeer = null;
+      }
     }
 
     // Reset back to normal state
@@ -4922,6 +4928,24 @@ function getHTML(env) {
       const ri = document.getElementById('roomInput');
       ri.value = roomCode;
       document.getElementById('joinBtn').click();
+    }
+
+    // ── Nearby: Post-Transfer Trust Offer ────────────────────────────────
+    function nearbyOfferTrust(deviceId, displayName) {
+      if (nearbyIsTrusted(deviceId)) return; // already trusted
+      const toastEl = document.getElementById('toast');
+      toastEl.innerHTML = \`
+        Trust <strong>\${displayName}</strong>? Skip confirmation next time.
+        <button id="nearbyTrustYes" style="margin-left:10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:13px;">Trust</button>
+      \`;
+      toastEl.style.display = 'flex';
+      toastEl.style.alignItems = 'center';
+      toastEl.classList.add('show');
+      document.getElementById('nearbyTrustYes').addEventListener('click', () => {
+        nearbyTrustDevice(deviceId, displayName);
+        showToast(\`\${displayName} trusted!\`);
+      });
+      setTimeout(() => toastEl.classList.remove('show'), 8000);
     }
     // ─────────────────────────────────────────────────────────────────────
 
