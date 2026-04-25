@@ -4831,6 +4831,66 @@ function getHTML(env) {
     }
     // ─────────────────────────────────────────────────────────────────────
 
+    // ── Nearby: Receiver Side ─────────────────────────────────────────────
+    const nearbyRequestModal = document.getElementById('nearbyRequestModal');
+    const nearbyRequestFrom = document.getElementById('nearbyRequestFrom');
+    const nearbyRequestFile = document.getElementById('nearbyRequestFile');
+    const nearbyRequestSize = document.getElementById('nearbyRequestSize');
+    const nearbyAcceptBtn = document.getElementById('nearbyAcceptBtn');
+    const nearbyDeclineBtn = document.getElementById('nearbyDeclineBtn');
+
+    let nearbyIncomingRequest = null; // { fromDeviceId, fromName, fileName, fileSize }
+
+    function nearbyHandleIncomingRequest(data) {
+      nearbyIncomingRequest = data;
+      const trusted = nearbyIsTrusted(data.fromDeviceId);
+      const autoDownload = localStorage.getItem('autoDownloadFiles') === 'true';
+
+      if (trusted && autoDownload) {
+        // Fully frictionless: auto-accept
+        nearbyAcceptIncoming();
+        return;
+      }
+
+      nearbyRequestFrom.textContent = \`\${data.fromName} wants to send you:\`;
+      nearbyRequestFile.textContent = data.fileName;
+      nearbyRequestSize.textContent = formatFileSize(data.fileSize);
+      nearbyRequestModal.style.display = 'flex';
+    }
+
+    function nearbyAcceptIncoming() {
+      if (!nearbyIncomingRequest) return;
+      const roomCode = Math.random().toString(10).slice(2, 8).padStart(6, '0');
+      const { fromDeviceId, fromName } = nearbyIncomingRequest;
+      // Store peer for trust offer BEFORE clearing
+      nearbyLastTransferPeer = { deviceId: fromDeviceId, displayName: fromName };
+      nearbyRequestModal.style.display = 'none';
+      nearbyWs.send(JSON.stringify({
+        type: 'send-response',
+        targetDeviceId: fromDeviceId,
+        accepted: true,
+        roomCode,
+      }));
+      nearbyReceiverJoinRoom(roomCode, nearbyIncomingRequest);
+      nearbyIncomingRequest = null;
+    }
+
+    function nearbyDeclineIncoming() {
+      if (!nearbyIncomingRequest) return;
+      nearbyWs.send(JSON.stringify({
+        type: 'send-response',
+        targetDeviceId: nearbyIncomingRequest.fromDeviceId,
+        accepted: false,
+        roomCode: null,
+      }));
+      nearbyRequestModal.style.display = 'none';
+      nearbyIncomingRequest = null;
+    }
+
+    nearbyAcceptBtn.addEventListener('click', nearbyAcceptIncoming);
+    nearbyDeclineBtn.addEventListener('click', nearbyDeclineIncoming);
+    // ─────────────────────────────────────────────────────────────────────
+
     sendModeBtn.addEventListener('click', () => {
       activateSendRole();
       lastSendTypeBtn = sendModeBtn;
