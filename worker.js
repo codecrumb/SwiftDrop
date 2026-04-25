@@ -1966,6 +1966,60 @@ function getHTML(env) {
       display: none;
     }
 
+    .settings-section-header {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 12px 0 4px;
+    }
+    .settings-beta-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      color: #fff;
+      background: #7c3aed;
+      border-radius: 4px;
+      padding: 1px 5px;
+      margin-left: 6px;
+      vertical-align: middle;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .nearby-name-edit {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+    }
+    .nearby-edit-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 3px 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .nearby-trusted-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .nearby-trusted-item:last-child { border-bottom: none; }
+    .nearby-trusted-remove {
+      background: none;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 6px;
+    }
+
     @media (max-width: 400px) {
       .settings-github-row { display: flex; }
     }
@@ -2620,6 +2674,40 @@ function getHTML(env) {
           <input type="checkbox" id="keepScreenAwakeToggle">
           <span class="settings-toggle-slider"></span>
         </label>
+      </div>
+      <div class="settings-section-header">
+        Nearby Devices <span class="settings-beta-badge">Beta</span>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Enable Nearby Discovery</span>
+          <span class="settings-desc">Find devices on the same network without a room code</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="nearbyEnabledToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+      <div id="nearbySettingsExpanded" style="display:none;">
+        <div class="settings-row">
+          <div class="settings-label">
+            <span>Your device name</span>
+            <span class="settings-desc">How you appear to nearby devices</span>
+          </div>
+          <div class="nearby-name-edit">
+            <span id="nearbyNameDisplay"></span>
+            <button class="nearby-edit-btn" id="nearbyEditNameBtn" title="Edit name">✏</button>
+          </div>
+        </div>
+        <div class="settings-row" id="nearbyNameInputRow" style="display:none;">
+          <input type="text" id="nearbyNameInput" maxlength="30" placeholder="Enter device name"
+                 style="flex:1; margin:0; font-size:14px;">
+          <button class="nearby-edit-btn" id="nearbyNameSaveBtn">Save</button>
+        </div>
+        <div class="settings-row settings-label" id="nearbyTrustedHeader" style="display:none;">
+          <span style="font-weight:600;">Trusted Devices</span>
+        </div>
+        <div id="nearbyTrustedList"></div>
       </div>
       <div class="settings-row settings-github-row">
         <a href="https://github.com/codecrumb/SwiftDrop" target="_blank" rel="noopener" class="settings-github-link">
