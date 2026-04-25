@@ -4591,24 +4591,69 @@ function getHTML(env) {
       leftReceiveState.style.display = 'none';
     }
 
-    sendRoleBtn.addEventListener('click', () => {
-      lastSendTypeBtn.click();
-    });
+    // ── Nearby Tab Visibility + Switching ────────────────────────────────
+    const nearbyRoleBtn = document.getElementById('nearbyRoleBtn');
+    const nearbySection = document.getElementById('nearbySection');
+    const nearbyIdentityName = document.getElementById('nearbyIdentityName');
+    const nearbyPeerList = document.getElementById('nearbyPeerList');
+    const nearbyEmpty = document.getElementById('nearbyEmpty');
+    const nearbyHint = document.getElementById('nearbyHint');
 
-    receiveRoleBtn.addEventListener('click', () => {
-      receiveRoleBtn.classList.add('active');
-      sendRoleBtn.classList.remove('active');
-      sendTypeSelector.style.display = 'none';
-      receiveSection.classList.add('active');
-      sendSection.classList.remove('active');
-      urlSection.classList.remove('active');
-      textSection.classList.remove('active');
-      roleHint.textContent = 'Enter the code shown on the other device';
-      status.style.display = 'none';
-      qrInlineWrapper.style.display = 'none';
-      leftReceiveState.style.display = '';
-      roomInput.focus();
-    });
+    function nearbyUpdateTabVisibility() {
+      nearbyRoleBtn.style.display = nearbyIsEnabled() ? '' : 'none';
+      if (!nearbyIsEnabled() && nearbySection.classList.contains('active')) {
+        switchToRole('send');
+      }
+    }
+
+    function switchToRole(role) {
+      [sendRoleBtn, receiveRoleBtn, nearbyRoleBtn].forEach(b => b.classList.remove('active'));
+      nearbySection.classList.remove('active');
+
+      if (role === 'send') {
+        lastSendTypeBtn.click();
+      } else if (role === 'receive') {
+        receiveRoleBtn.classList.add('active');
+        sendTypeSelector.style.display = 'none';
+        receiveSection.classList.add('active');
+        sendSection.classList.remove('active');
+        urlSection.classList.remove('active');
+        textSection.classList.remove('active');
+        roleHint.textContent = 'Enter the code shown on the other device';
+        status.style.display = 'none';
+        qrInlineWrapper.style.display = 'none';
+        leftReceiveState.style.display = '';
+        roomInput.focus();
+      } else if (role === 'nearby') {
+        nearbyRoleBtn.classList.add('active');
+        nearbySection.classList.add('active');
+        sendTypeSelector.style.display = 'none';
+        receiveSection.classList.remove('active');
+        sendSection.classList.remove('active');
+        urlSection.classList.remove('active');
+        textSection.classList.remove('active');
+        status.style.display = 'none';
+        qrInlineWrapper.style.display = 'none';
+        leftReceiveState.style.display = 'none';
+        roleHint.textContent = 'Tap a device to send';
+        nearbyIdentityName.textContent = nearbyGetIdentity().displayName;
+        nearbyUpdateHint();
+      }
+    }
+
+    function nearbyUpdateHint() {
+      const fileList = document.getElementById('fileList');
+      const hasFile = fileList && fileList.children.length > 0;
+      nearbyHint.style.display = hasFile ? 'none' : '';
+    }
+
+    nearbyRoleBtn.addEventListener('click', () => switchToRole('nearby'));
+    sendRoleBtn.addEventListener('click', () => switchToRole('send'));
+    receiveRoleBtn.addEventListener('click', () => switchToRole('receive'));
+
+    // Init: show/hide Nearby tab based on saved setting
+    nearbyUpdateTabVisibility();
+    // ─────────────────────────────────────────────────────────────────────
 
     sendModeBtn.addEventListener('click', () => {
       activateSendRole();
