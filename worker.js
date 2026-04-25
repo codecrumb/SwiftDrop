@@ -3991,6 +3991,12 @@ function getHTML(env) {
             sendTextBtn.disabled = false;
             sendTextBtn.textContent = 'Send Text (P2P)';
           }
+
+          // Nearby: auto-send if triggered from Nearby tab
+          if (nearbyAutoSendPending) {
+            nearbyAutoSendPending = false;
+            setTimeout(() => sendFile(), 100);
+          }
         }
       };
 
@@ -4889,6 +4895,34 @@ function getHTML(env) {
 
     nearbyAcceptBtn.addEventListener('click', nearbyAcceptIncoming);
     nearbyDeclineBtn.addEventListener('click', nearbyDeclineIncoming);
+    // ─────────────────────────────────────────────────────────────────────
+
+    // ── Nearby: Transfer Handoff ──────────────────────────────────────────
+    let nearbyAutoSendPending = false;
+
+    function nearbyTriggerSend(roomCode, file) {
+      // File is already in selectedFiles (user picked it before tapping nearby device)
+      // Close existing signaling connection and join as sender with the given room code
+      isSender = true;
+      if (ws) {
+        isIntentionalClose = true;
+        ws.close();
+        isIntentionalClose = false;
+      }
+      roomCodeEl.textContent = roomCode;
+      generateQRCode(roomCode);
+      connectWebSocket(roomCode);
+      status.classList.add('clickable');
+      nearbyAutoSendPending = true;
+    }
+
+    function nearbyReceiverJoinRoom(roomCode) {
+      // Switch to receive tab and auto-join the room
+      switchToRole('receive');
+      const ri = document.getElementById('roomInput');
+      ri.value = roomCode;
+      document.getElementById('joinBtn').click();
+    }
     // ─────────────────────────────────────────────────────────────────────
 
     sendModeBtn.addEventListener('click', () => {
