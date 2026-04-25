@@ -2019,6 +2019,89 @@ function getHTML(env) {
       font-size: 12px;
       padding: 2px 6px;
     }
+    .nearby-identity-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .nearby-identity-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .nearby-peer-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 120px;
+    }
+    .nearby-empty {
+      text-align: center;
+      padding: 24px 0;
+      color: var(--text-secondary);
+    }
+    .nearby-peer-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .nearby-peer-item:hover { background: var(--hover-bg, rgba(0,0,0,0.04)); }
+    .nearby-peer-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .nearby-peer-trusted {
+      font-size: 11px;
+      color: #7c3aed;
+      margin-left: 6px;
+    }
+    .nearby-peer-status {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .nearby-hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-align: center;
+      margin-top: 10px;
+    }
+    /* Incoming request modal */
+    .nearby-request-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .nearby-request-content {
+      background: var(--card-bg, #fff);
+      border-radius: 16px;
+      padding: 28px 24px;
+      max-width: 320px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    body.dark-mode .nearby-request-content { background: #1e1e2e; }
+    .nearby-request-icon { font-size: 36px; margin-bottom: 8px; }
+    .nearby-request-from { font-weight: 700; font-size: 17px; margin-bottom: 4px; }
+    .nearby-request-file { font-size: 14px; color: var(--text-secondary); word-break: break-all; }
+    .nearby-request-size { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; }
+    .nearby-request-actions { display: flex; gap: 10px; justify-content: center; }
+    .nearby-request-actions .btn { flex: 1; }
+    .nearby-request-actions .btn-reset {
+      flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);
+      background: none; cursor: pointer; font-size: 14px; color: var(--text-secondary);
+    }
 
     @media (max-width: 400px) {
       .settings-github-row { display: flex; }
@@ -2520,6 +2603,7 @@ function getHTML(env) {
     <div class="right-panel">
     <div class="role-selector">
       <button class="role-btn active" id="sendRoleBtn">📤 Send</button>
+      <button class="role-btn nearby-tab-btn" id="nearbyRoleBtn" style="display:none;">📡 Nearby</button>
       <button class="role-btn" id="receiveRoleBtn">📥 Receive</button>
     </div>
     <p class="role-hint" id="roleHint">Share your room code with the other device</p>
@@ -2572,6 +2656,22 @@ function getHTML(env) {
         <button id="clearTextBtn" class="paste-btn" style="flex: 1;">✕ Clear</button>
       </div>
       <button class="btn btn-waiting" id="sendTextBtn" disabled style="margin-top: 10px;">Waiting for receiver...</button>
+    </div>
+
+    <!-- Nearby Mode -->
+    <div class="section" id="nearbySection">
+      <div class="nearby-identity-row">
+        <span class="nearby-identity-label">You appear as:</span>
+        <span class="nearby-identity-name" id="nearbyIdentityName"></span>
+      </div>
+      <div class="nearby-peer-list" id="nearbyPeerList">
+        <div class="nearby-empty" id="nearbyEmpty">
+          <div style="font-size:32px; margin-bottom:8px;">📡</div>
+          <div style="font-weight:600; margin-bottom:4px;">Looking for devices…</div>
+          <div style="font-size:13px; color:var(--text-secondary);">Other devices on this network will appear here</div>
+        </div>
+      </div>
+      <p class="nearby-hint" id="nearbyHint" style="display:none;">Select a file in <strong>Send</strong> tab first, then tap a device</p>
     </div>
 
     <!-- Receive Mode -->
@@ -2728,6 +2828,20 @@ function getHTML(env) {
         <div id="qrcode"></div>
       </div>
       <div class="qr-modal-instructions">Scan to join instantly</div>
+    </div>
+  </div>
+
+  <!-- Nearby: Incoming Transfer Request Modal -->
+  <div class="nearby-request-modal" id="nearbyRequestModal" style="display:none;">
+    <div class="nearby-request-content">
+      <div class="nearby-request-icon">📡</div>
+      <div class="nearby-request-from" id="nearbyRequestFrom"></div>
+      <div class="nearby-request-file" id="nearbyRequestFile"></div>
+      <div class="nearby-request-size" id="nearbyRequestSize"></div>
+      <div class="nearby-request-actions">
+        <button class="btn" id="nearbyAcceptBtn">Accept</button>
+        <button class="btn-reset" id="nearbyDeclineBtn">Decline</button>
+      </div>
     </div>
   </div>
 
