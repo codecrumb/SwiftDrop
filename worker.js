@@ -4750,6 +4750,87 @@ function getHTML(env) {
     }
     // ─────────────────────────────────────────────────────────────────────
 
+    // ── Nearby Message Handler ────────────────────────────────────────────
+    function nearbyHandleMessage(data) {
+      switch (data.type) {
+        case 'connected':
+          console.log('[Nearby] Session:', data.sessionId);
+          break;
+
+        case 'peer-list':
+          nearbyPeers = data.peers;
+          nearbyRenderPeers();
+          break;
+
+        case 'send-request':
+          nearbyHandleIncomingRequest(data);
+          break;
+
+        case 'send-accepted':
+          // Receiver accepted — join the room they created
+          nearbySenderJoinRoom(data.roomCode);
+          break;
+
+        case 'send-declined':
+          nearbyClosePendingRequest();
+          showToast('Transfer declined');
+          break;
+
+        case 'pong':
+          break;
+
+        default:
+          console.log('[Nearby] Unknown message:', data.type);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    // ── Nearby: Sender Side ───────────────────────────────────────────────
+    let nearbySendTargetDeviceId = null;
+    let nearbySendFile = null;
+    let nearbyLastTransferPeer = null; // { deviceId, displayName }
+
+    function nearbyInitiateSend(peer) {
+      const fileInput = document.getElementById('fileInput');
+      const files = fileInput ? fileInput.files : null;
+      if (!files || files.length === 0) {
+        switchToRole('send');
+        showToast('Select a file first, then come back to Nearby');
+        return;
+      }
+      const file = files[0]; // v1: single file
+      nearbySendTargetDeviceId = peer.deviceId;
+      nearbySendFile = file;
+
+      // Update peer item to show "Waiting…"
+      const item = nearbyPeerList.querySelector(\`[data-device-id="\${peer.deviceId}"]\`);
+      if (item) item.querySelector('.nearby-peer-status').textContent = 'Waiting…';
+
+      nearbyWs.send(JSON.stringify({
+        type: 'send-request',
+        targetDeviceId: peer.deviceId,
+        fileName: file.name,
+        fileSize: file.size,
+      }));
+    }
+
+    function nearbySenderJoinRoom(roomCode) {
+      if (!nearbySendFile) return;
+      const peer = nearbyPeers.find(p => p.deviceId === nearbySendTargetDeviceId);
+      if (peer) nearbyLastTransferPeer = { deviceId: peer.deviceId, displayName: peer.displayName };
+      switchToRole('send');
+      nearbyTriggerSend(roomCode, nearbySendFile);
+      nearbySendTargetDeviceId = null;
+      nearbySendFile = null;
+    }
+
+    function nearbyClosePendingRequest() {
+      nearbySendTargetDeviceId = null;
+      nearbySendFile = null;
+      nearbyRenderPeers();
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     sendModeBtn.addEventListener('click', () => {
       activateSendRole();
       lastSendTypeBtn = sendModeBtn;
