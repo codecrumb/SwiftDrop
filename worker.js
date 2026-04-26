@@ -4034,12 +4034,8 @@ function getHTML(env) {
           // Handle URL message
           if (data.type === 'url') {
             statusText.textContent = '🔗 Received URL!';
-            showToast('Opening URL in new tab...');
-
-            // Open in new tab so user can receive multiple links
-            setTimeout(() => {
-              window.open(data.url, '_blank', 'noopener');
-            }, 1000);
+            showUrlToast(data.url);
+            window.open(data.url, '_blank', 'noopener');
             return;
           }
 
@@ -4352,12 +4348,8 @@ function getHTML(env) {
     function handleUrlFallback(data) {
       // Receiver gets URL redirect link (fallback)
       statusText.textContent = '🔗 Received URL (via cloud)!';
-      showToast('Opening URL in new tab...');
-
-      // Open in new tab so user can receive multiple links
-      setTimeout(() => {
-        window.open(data.redirectUrl, '_blank', 'noopener');
-      }, 1000);
+      showUrlToast(data.redirectUrl);
+      window.open(data.redirectUrl, '_blank', 'noopener');
     }
 
     function handleTextFallback(data) {
@@ -4566,6 +4558,28 @@ function getHTML(env) {
       setTimeout(() => {
         toast.classList.remove('show');
       }, 3000);
+    }
+
+    function showUrlToast(url) {
+      // Show a persistent clickable link as fallback for blocked popups.
+      // window.open with 'noopener' always returns null in modern browsers,
+      // so we can't detect blocking — just always show the link.
+      toast.textContent = '';
+      const label = document.createElement('div');
+      label.textContent = '🔗 URL received — tap to open:';
+      label.style.cssText = 'margin-bottom:8px;font-weight:500;font-size:13px;';
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      const display = url.length > 45 ? url.slice(0, 45) + '…' : url;
+      link.textContent = display;
+      link.style.cssText = 'display:block;word-break:break-all;color:#007aff;font-size:12px;';
+      link.addEventListener('click', () => toast.classList.remove('show'));
+      toast.appendChild(label);
+      toast.appendChild(link);
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 10000);
     }
     
     function showError(message) {
