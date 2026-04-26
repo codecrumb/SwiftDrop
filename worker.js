@@ -3119,13 +3119,6 @@ function getHTML(env) {
       }
     }
 
-    // Re-acquire after tab becomes visible again (wake lock auto-releases on hide)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && transferInProgress) {
-        acquireWakeLock();
-      }
-    });
-
     let transferInProgress = false;
 
     window.addEventListener('beforeunload', (e) => {
@@ -4809,12 +4802,44 @@ function getHTML(env) {
       }, 25000);
     }
 
-    // Reconnect when tab regains focus
+    // ── Tab Visibility Management ─────────────────────────────────────────────
+    // Disconnect WebSockets after 60s hidden to avoid wasting Durable Object
+    // invocations. Reconnect immediately when the tab becomes visible again.
+    // P2P (WebRTC data channel) is unaffected — it is peer-to-peer.
+    let visibilityHideTimer = null;
+
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && nearbyIsEnabled()) {
-        nearbyConnect();
+      if (document.visibilityState === 'hidden') {
+        visibilityHideTimer = setTimeout(() => {
+          visibilityHideTimer = null;
+          if (transferInProgress) return;
+
+          if (ws && ws.readyState <= WebSocket.OPEN) {
+            isIntentionalClose = true;
+            ws.close();
+            isIntentionalClose = false;
+          }
+
+          nearbyDisconnect();
+        }, 60_000);
+      } else {
+        if (visibilityHideTimer !== null) {
+          clearTimeout(visibilityHideTimer);
+          visibilityHideTimer = null;
+        }
+
+        if (roomCode && (!ws || ws.readyState > WebSocket.OPEN)) {
+          connectWebSocket(roomCode, true);
+        }
+
+        if (nearbyIsEnabled() && (!nearbyWs || nearbyWs.readyState > WebSocket.OPEN)) {
+          nearbyConnect();
+        }
+
+        if (transferInProgress) acquireWakeLock();
       }
     });
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Auto-connect on load if enabled
     if (nearbyIsEnabled()) nearbyConnect();
