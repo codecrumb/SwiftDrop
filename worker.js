@@ -4749,6 +4749,7 @@ function getHTML(env) {
 
     // ── NearbyLobby WebSocket Client ──────────────────────────────────────
     let nearbyWs = null;
+    let nearbyIntentionalClose = false;
     let nearbyPeers = []; // [{ deviceId, displayName }]
 
     function nearbyConnect() {
@@ -4778,8 +4779,9 @@ function getHTML(env) {
         console.log('[Nearby] Disconnected');
         nearbyPeers = [];
         nearbyRenderPeers();
-        // Reconnect after 3s if still enabled
-        if (nearbyIsEnabled()) setTimeout(nearbyConnect, 3000);
+        // Reconnect after 3s if still enabled and close was not intentional
+        if (nearbyIsEnabled() && !nearbyIntentionalClose) setTimeout(nearbyConnect, 3000);
+        nearbyIntentionalClose = false;
       });
 
       nearbyWs.addEventListener('error', () => {
@@ -4789,6 +4791,7 @@ function getHTML(env) {
 
     function nearbyDisconnect() {
       if (nearbyWs) {
+        nearbyIntentionalClose = true;
         nearbyWs.close();
         nearbyWs = null;
       }
