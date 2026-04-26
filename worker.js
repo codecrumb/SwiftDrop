@@ -4034,11 +4034,11 @@ function getHTML(env) {
           // Handle URL message
           if (data.type === 'url') {
             statusText.textContent = '🔗 Received URL!';
-            showToast('Redirecting to URL...');
+            showToast('Opening URL in new tab...');
 
-            // Wait a moment then redirect
+            // Open in new tab so user can receive multiple links
             setTimeout(() => {
-              window.location.href = data.url;
+              window.open(data.url, '_blank', 'noopener');
             }, 1000);
             return;
           }
@@ -4352,11 +4352,11 @@ function getHTML(env) {
     function handleUrlFallback(data) {
       // Receiver gets URL redirect link (fallback)
       statusText.textContent = '🔗 Received URL (via cloud)!';
-      showToast('Redirecting to URL...');
+      showToast('Opening URL in new tab...');
 
-      // Wait a moment then redirect
+      // Open in new tab so user can receive multiple links
       setTimeout(() => {
-        window.location.href = data.redirectUrl;
+        window.open(data.redirectUrl, '_blank', 'noopener');
       }, 1000);
     }
 
