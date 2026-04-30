@@ -3589,6 +3589,8 @@ function getHTML(env) {
     const progressText = document.getElementById('progressText');
     const errorDiv = document.getElementById('error');
     const toast = document.getElementById('toast');
+    const popupOverlay = document.getElementById('popupOverlay');
+    const popupModal = document.getElementById('popupModal');
     const telehostPromo = document.getElementById('telehostPromo');
     const receiveSuccessPanel = document.getElementById('receiveSuccessPanel');
     const successIcon = document.getElementById('successIcon');
@@ -4922,27 +4924,27 @@ function getHTML(env) {
       }, 3000);
     }
 
-    function showUrlToast(url) {
-      // Show a persistent clickable link as fallback for blocked popups.
-      // window.open with 'noopener' always returns null in modern browsers,
-      // so we can't detect blocking — just always show the link.
-      toast.textContent = '';
-      const label = document.createElement('div');
-      label.textContent = '🔗 URL received — tap to open:';
-      label.style.cssText = 'margin-bottom:8px;font-weight:500;font-size:13px;';
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      const display = url.length > 45 ? url.slice(0, 45) + '…' : url;
-      link.textContent = display;
-      link.style.cssText = 'display:block;word-break:break-all;color:#007aff;font-size:12px;';
-      link.addEventListener('click', () => toast.classList.remove('show'));
-      toast.appendChild(label);
-      toast.appendChild(link);
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 10000);
+    let _pendingPopupUrl = null;
+
+    function showPopupBlockedModal(url) {
+      _pendingPopupUrl = url;
+      popupOverlay.classList.add('active');
+      popupModal.classList.add('active');
     }
+
+    function hidePopupBlockedModal() {
+      popupOverlay.classList.remove('active');
+      popupModal.classList.remove('active');
+      _pendingPopupUrl = null;
+    }
+
+    document.getElementById('popupRetry').addEventListener('click', () => {
+      if (_pendingPopupUrl) window.open(_pendingPopupUrl, '_blank');
+      hidePopupBlockedModal();
+    });
+
+    document.getElementById('popupCancel').addEventListener('click', hidePopupBlockedModal);
+    document.getElementById('popupOverlay').addEventListener('click', hidePopupBlockedModal);
     
     function showError(message) {
       errorDiv.textContent = '❌ ' + message;
