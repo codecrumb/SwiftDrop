@@ -73,7 +73,10 @@ export default {
     // Help page: allowing pop-ups
     if (url.pathname === '/help/popups' && request.method === 'GET') {
       return new Response(getHelpPage(), {
-        headers: { 'Content-Type': 'text/html;charset=UTF-8' }
+        headers: {
+          'Content-Type': 'text/html;charset=UTF-8',
+          'Cache-Control': 'public, max-age=3600'
+        }
       });
     }
 
@@ -1092,6 +1095,10 @@ export class NearbyLobby {
   }
 }
 
+/**
+ * Self-contained HTML help page explaining how to allow pop-ups.
+ * Served at GET /help/popups — linked from the pop-up-blocked modal footer.
+ */
 function getHelpPage() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1142,6 +1149,7 @@ function getHelpPage() {
     color: var(--text-primary);
     min-height: 100vh;
     display: flex;
+    align-items: flex-start;
     justify-content: center;
     padding: 48px 16px 64px;
   }
