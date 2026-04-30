@@ -27,3 +27,4 @@ thumbs.db
 *.class
 wrangler.toml.local
 .worktrees/
+.superpowers/
