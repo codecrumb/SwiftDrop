@@ -71,11 +71,13 @@ Retry button: `#4f46e5` (indigo) — matches existing primary action color in th
 
 ## Help Page
 
-**URL:** `https://telegra.ph/Allowing-SwiftDrop-to-open-new-tabs-04-30`
+**Route:** `/help/popups` — served directly from `worker.js` as a new route handler.
 
-**Screenshot image:** `allow-new-tab.png` hosted on Imgur (direct `.png` URL), embedded in the telegra.ph page as an image block.
+**Screenshot image:** `https://i.imgur.com/8LQP8oS.png` (Imgur CDN) — referenced via `<img>` tag in the help page HTML.
 
-The help page explains that Retry always works and that the settings change is only needed to prevent future prompts. Tone is informational, not alarming.
+The help page is a self-contained styled HTML page served from the Worker. It matches SwiftDrop's brand (dark/light theme aware), includes the screenshot, and explains that Retry always works and the settings change is only needed to prevent future prompts. Tone is informational, not alarming.
+
+The modal's footer link opens `/help/popups` in a new tab (`target="_blank"`). When the project migrates to Cloudflare Pages, the image moves to `public/` and the URL gets updated — one-line change.
 
 ---
 
