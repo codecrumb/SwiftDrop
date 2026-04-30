@@ -4398,8 +4398,8 @@ function getHTML(env) {
           // Handle URL message
           if (data.type === 'url') {
             statusText.textContent = '🔗 Received URL!';
-            showUrlToast(data.url);
-            window.open(data.url, '_blank', 'noopener');
+            const _tab = window.open(data.url, '_blank');
+            if (!_tab) showPopupBlockedModal(data.url);
             return;
           }
 
@@ -4710,10 +4710,9 @@ function getHTML(env) {
     }
 
     function handleUrlFallback(data) {
-      // Receiver gets URL redirect link (fallback)
       statusText.textContent = '🔗 Received URL (via cloud)!';
-      showUrlToast(data.redirectUrl);
-      window.open(data.redirectUrl, '_blank', 'noopener');
+      const _tab = window.open(data.redirectUrl, '_blank');
+      if (!_tab) showPopupBlockedModal(data.redirectUrl);
     }
 
     function handleTextFallback(data) {
