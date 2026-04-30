@@ -3078,7 +3078,7 @@ function getHTML(env) {
   <div class="toast" id="toast"></div>
 
   <div class="popup-overlay" id="popupOverlay"></div>
-  <div class="popup-modal" id="popupModal" role="dialog" aria-modal="true" aria-labelledby="popupModalTitle">
+  <div class="popup-modal" id="popupModal" role="dialog" aria-modal="true" aria-labelledby="popupModalTitle" aria-describedby="popupModalDesc">
     <div class="popup-modal-header">
       <div class="popup-modal-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -3089,7 +3089,7 @@ function getHTML(env) {
       </div>
       <h2 class="popup-modal-title" id="popupModalTitle">Pop-up blocked</h2>
     </div>
-    <p class="popup-modal-body">Your browser blocked a new tab from opening. Click <strong>Retry</strong> to open it.</p>
+    <p class="popup-modal-body" id="popupModalDesc">Your browser blocked a new tab from opening. Click <strong>Retry</strong> to open it.</p>
     <div class="popup-modal-actions">
       <button class="popup-modal-retry" id="popupRetry">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
@@ -4985,6 +4985,7 @@ function getHTML(env) {
       if (e.key === 'Escape') {
         if (qrModal.classList.contains('show')) closeQRModal();
         if (settingsModal.classList.contains('show')) closeSettingsModal();
+        if (popupModal.classList.contains('active')) hidePopupBlockedModal();
       }
     });
 
