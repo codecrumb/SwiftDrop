@@ -2953,21 +2953,21 @@ function getHTML(env) {
   <div class="toast" id="toast"></div>
 
   <div class="popup-overlay" id="popupOverlay"></div>
-  <div class="popup-modal" id="popupModal">
+  <div class="popup-modal" id="popupModal" role="dialog" aria-modal="true" aria-labelledby="popupModalTitle">
     <div class="popup-modal-header">
       <div class="popup-modal-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <polygon points="10.29 3.86 1.82 18 22.18 18 13.71 3.86 10.29 3.86"></polygon>
           <line x1="12" y1="9" x2="12" y2="13"></line>
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
       </div>
-      <h2 class="popup-modal-title">Pop-up blocked</h2>
+      <h2 class="popup-modal-title" id="popupModalTitle">Pop-up blocked</h2>
     </div>
     <p class="popup-modal-body">Your browser blocked a new tab from opening. Click <strong>Retry</strong> to open it.</p>
     <div class="popup-modal-actions">
       <button class="popup-modal-retry" id="popupRetry">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
           <polyline points="1 4 1 10 7 10"></polyline>
           <path d="M3.51 15a9 9 0 1 0 .49-3.7"></path>
         </svg>
