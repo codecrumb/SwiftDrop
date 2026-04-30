@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocked Popup Modal — Themed</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #111;
+    color: #f0f0f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 28px; }
+
+  .pair-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .pair-label span {
+    color: #a78bfa;
+    background: rgba(124,58,237,0.15);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 10px;
+  }
+
+  .section {
+    margin-bottom: 40px;
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* Preview wrapper */
+  .preview-dark {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    min-height: 280px;
+  }
+  .preview-light {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    min-height: 280px;
+  }
+  .mode-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 12px;
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+  .preview-col {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Feather alert-triangle icon as inline SVG */
+  .warn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    margin: 0 auto 14px;
+    flex-shrink: 0;
+  }
+  .warn-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+
+  /* ============================
+     OPTION A — centered, clean
+  ============================= */
+  .modal-dark-a {
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 14px;
+    padding: 26px 22px 20px;
+    width: 280px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    text-align: center;
+  }
+  .modal-dark-a .warn-icon {
+    background: rgba(251,191,36,0.12);
+  }
+  .modal-dark-a .warn-icon svg { stroke: #fbbf24; }
+  .modal-dark-a h2 {
+    font-size: 14px; font-weight: 700; color: #f3f4f6; margin-bottom: 8px; line-height: 1.4;
+  }
+  .modal-dark-a p {
+    font-size: 12px; color: #9ca3af; line-height: 1.65; margin-bottom: 18px;
+  }
+  .modal-dark-a p a { color: #818cf8; text-decoration: none; }
+  .modal-dark-a .actions { display: flex; gap: 8px; }
+  .modal-dark-a .btn-r {
+    flex: 1; background: #4f46e5; color: #fff; border: none;
+    border-radius: 8px; padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .modal-dark-a .btn-c {
+    flex: 1; background: transparent; color: #9ca3af;
+    border: 1px solid #374151; border-radius: 8px;
+    padding: 9px; font-size: 13px; cursor: pointer;
+  }
+
+  .modal-light-a {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 26px 22px 20px;
+    width: 280px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+    text-align: center;
+  }
+  .modal-light-a .warn-icon {
+    background: rgba(245,158,11,0.1);
+  }
+  .modal-light-a .warn-icon svg { stroke: #d97706; }
+  .modal-light-a h2 {
+    font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 8px; line-height: 1.4;
+  }
+  .modal-light-a p {
+    font-size: 12px; color: #6b7280; line-height: 1.65; margin-bottom: 18px;
+  }
+  .modal-light-a p a { color: #4f46e5; text-decoration: none; }
+  .modal-light-a .actions { display: flex; gap: 8px; }
+  .modal-light-a .btn-r {
+    flex: 1; background: #4f46e5; color: #fff; border: none;
+    border-radius: 8px; padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .modal-light-a .btn-c {
+    flex: 1; background: #f3f4f6; color: #6b7280; border: none;
+    border-radius: 8px; padding: 9px; font-size: 13px; cursor: pointer;
+  }
+
+  /* ============================
+     OPTION B — left-aligned header
+  ============================= */
+  .modal-dark-b {
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 14px;
+    padding: 22px;
+    width: 280px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  .modal-dark-b .header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .modal-dark-b .icon-wrap {
+    width: 36px; height: 36px; background: rgba(251,191,36,0.12);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .modal-dark-b .icon-wrap svg { width: 18px; height: 18px; stroke: #fbbf24; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .modal-dark-b h2 { font-size: 14px; font-weight: 700; color: #f3f4f6; line-height: 1.3; }
+  .modal-dark-b p { font-size: 12px; color: #9ca3af; line-height: 1.65; margin-bottom: 16px; }
+  .modal-dark-b p a { color: #818cf8; text-decoration: none; }
+  .modal-dark-b .actions { display: flex; gap: 8px; }
+  .modal-dark-b .btn-r {
+    flex: 2; background: #4f46e5; color: #fff; border: none;
+    border-radius: 8px; padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+  }
+  .modal-dark-b .btn-c {
+    flex: 1; background: transparent; color: #9ca3af; border: 1px solid #374151;
+    border-radius: 8px; padding: 9px; font-size: 12px; cursor: pointer; text-align: center;
+  }
+
+  .modal-light-b {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 22px;
+    width: 280px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+  }
+  .modal-light-b .header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .modal-light-b .icon-wrap {
+    width: 36px; height: 36px; background: rgba(245,158,11,0.1);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .modal-light-b .icon-wrap svg { width: 18px; height: 18px; stroke: #d97706; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .modal-light-b h2 { font-size: 14px; font-weight: 700; color: #111827; line-height: 1.3; }
+  .modal-light-b p { font-size: 12px; color: #6b7280; line-height: 1.65; margin-bottom: 16px; }
+  .modal-light-b p a { color: #4f46e5; text-decoration: none; }
+  .modal-light-b .actions { display: flex; gap: 8px; }
+  .modal-light-b .btn-r {
+    flex: 2; background: #4f46e5; color: #fff; border: none;
+    border-radius: 8px; padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+  }
+  .modal-light-b .btn-c {
+    flex: 1; background: #f3f4f6; color: #6b7280; border: none;
+    border-radius: 8px; padding: 9px; font-size: 12px; cursor: pointer; text-align: center;
+  }
+
+  /* Option labels */
+  .opt-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .opt-letter {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(124,58,237,0.2); border: 1px solid #7c3aed;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #a78bfa;
+  }
+  .opt-name { font-size: 13px; font-weight: 600; color: #ddd; }
+  .opt-desc { font-size: 11px; color: #666; }
+
+  .recommend-badge {
+    font-size: 10px; background: rgba(124,58,237,0.2); color: #a78bfa;
+    border: 1px solid rgba(124,58,237,0.3); border-radius: 99px; padding: 2px 8px;
+    font-weight: 600;
+  }
+
+  .selection-note {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 12px;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+
+<h1>Blocked popup modal — themed variants</h1>
+<p class="subtitle">Each option shown in dark mode (left) and light mode (right). Using Feather's <code>alert-triangle</code> icon.</p>
+
+<!-- OPTION A -->
+<div class="section">
+  <div class="opt-header">
+    <div class="opt-letter">A</div>
+    <div>
+      <div class="opt-name">Centered · icon on top <span class="recommend-badge">my pick</span></div>
+      <div class="opt-desc">Symmetric layout, icon+title centered, body text below, side-by-side buttons</div>
+    </div>
+  </div>
+  <div class="split">
+    <div class="preview-col">
+      <div class="mode-label">DARK MODE</div>
+      <div class="preview-dark">
+        <div class="modal-dark-a">
+          <div class="warn-icon">
+            <svg viewBox="0 0 24 24" stroke="#fbbf24">
+              <polygon points="10.29 3.86 1.82 18 22.18 18 13.71 3.86 10.29 3.86"></polygon>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <h2>Browser blocked opening a new tab</h2>
+          <p>Press <strong style="color:#f3f4f6">Retry</strong> to try again.<br><br>
+          Please allow pop-ups for this site in your <a href="#">browser settings →</a></p>
+          <div class="actions">
+            <button class="btn-r">↻ Retry</button>
+            <button class="btn-c">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="preview-col">
+      <div class="mode-label">LIGHT MODE</div>
+      <div class="preview-light">
+        <div class="modal-light-a">
+          <div class="warn-icon">
+            <svg viewBox="0 0 24 24" stroke="#d97706">
+              <polygon points="10.29 3.86 1.82 18 22.18 18 13.71 3.86 10.29 3.86"></polygon>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <h2>Browser blocked opening a new tab</h2>
+          <p>Press <strong style="color:#111827">Retry</strong> to try again.<br><br>
+          Please allow pop-ups for this site in your <a href="#">browser settings →</a></p>
+          <div class="actions">
+            <button class="btn-r">↻ Retry</button>
+            <button class="btn-c">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION B -->
+<div class="section">
+  <div class="opt-header">
+    <div class="opt-letter">B</div>
+    <div>
+      <div class="opt-name">Left-aligned · icon inline with title</div>
+      <div class="opt-desc">Icon sits beside the title, text flows below; Retry gets more weight than Cancel</div>
+    </div>
+  </div>
+  <div class="split">
+    <div class="preview-col">
+      <div class="mode-label">DARK MODE</div>
+      <div class="preview-dark">
+        <div class="modal-dark-b">
+          <div class="header">
+            <div class="icon-wrap">
+              <svg viewBox="0 0 24 24">
+                <polygon points="10.29 3.86 1.82 18 22.18 18 13.71 3.86 10.29 3.86"></polygon>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <h2>Browser blocked opening a new tab</h2>
+          </div>
+          <p>Press <strong style="color:#f3f4f6">Retry</strong> to try again.<br><br>
+          Please allow pop-ups for this site in your <a href="#">browser settings →</a></p>
+          <div class="actions">
+            <div class="btn-r">↻ Retry</div>
+            <div class="btn-c">Cancel</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="preview-col">
+      <div class="mode-label">LIGHT MODE</div>
+      <div class="preview-light">
+        <div class="modal-light-b">
+          <div class="header">
+            <div class="icon-wrap">
+              <svg viewBox="0 0 24 24">
+                <polygon points="10.29 3.86 1.82 18 22.18 18 13.71 3.86 10.29 3.86"></polygon>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <h2>Browser blocked opening a new tab</h2>
+          </div>
+          <p>Press <strong style="color:#111827">Retry</strong> to try again.<br><br>
+          Please allow pop-ups for this site in your <a href="#">browser settings →</a></p>
+          <div class="actions">
+            <div class="btn-r">↻ Retry</div>
+            <div class="btn-c">Cancel</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="selection-note">Let me know which you prefer (A or B), and any tweaks to wording, spacing, or button layout — in the terminal.</div>
+
+</body>
+</html>

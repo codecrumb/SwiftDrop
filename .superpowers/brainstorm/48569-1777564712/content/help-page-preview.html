@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Help page preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0d0d0d;
+    color: #f0f0f0;
+    min-height: 100vh;
+    padding: 28px;
+  }
+
+  h1 { font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #555; margin-bottom: 28px; }
+
+  .outer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ---- telegra.ph simulation ---- */
+  .telegraph-frame {
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    color: #222;
+  }
+  .telegraph-bar {
+    background: #f7f7f7;
+    border-bottom: 1px solid #e8e8e8;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f56; }
+  .dot-y { background: #ffbd2e; }
+  .dot-g { background: #27c93f; }
+  .url-bar {
+    background: #ececec;
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #888;
+    flex: 1;
+    margin-left: 6px;
+    font-family: 'SF Mono', monospace;
+  }
+
+  .telegraph-body {
+    padding: 32px 36px 40px;
+  }
+  .tg-title {
+    font-family: Georgia, serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #111;
+    line-height: 1.25;
+    margin-bottom: 6px;
+  }
+  .tg-author {
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .tg-body {
+    font-family: Georgia, serif;
+    font-size: 15px;
+    color: #333;
+    line-height: 1.75;
+  }
+  .tg-body p { margin-bottom: 16px; }
+  .tg-body h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111;
+    margin: 22px 0 10px;
+    font-family: -apple-system, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+  }
+  .tg-body ol {
+    padding-left: 20px;
+    margin-bottom: 16px;
+  }
+  .tg-body ol li {
+    margin-bottom: 8px;
+  }
+  .tg-body strong { color: #111; }
+
+  /* Screenshot placeholder */
+  .screenshot-placeholder {
+    background: linear-gradient(135deg, #f0f4ff, #e8eeff);
+    border: 1px solid #d0d8ff;
+    border-radius: 8px;
+    padding: 28px 20px;
+    text-align: center;
+    margin: 18px 0;
+    font-size: 12px;
+    color: #8090cc;
+  }
+  .screenshot-placeholder .icon { font-size: 28px; margin-bottom: 8px; }
+  .screenshot-placeholder p { font-size: 11px; color: #aab; }
+
+  .tg-body .tip {
+    background: #f8f9ff;
+    border-left: 3px solid #6366f1;
+    padding: 10px 14px;
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    font-family: -apple-system, sans-serif;
+    color: #555;
+    margin: 16px 0;
+  }
+  .tg-body .tip strong { color: #4f46e5; }
+
+  /* ---- right panel: notes ---- */
+  .notes {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .note-card {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .note-card h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #666;
+    margin-bottom: 7px;
+    font-weight: 600;
+  }
+  .note-card p {
+    font-size: 12px;
+    color: #aaa;
+    line-height: 1.6;
+  }
+  .note-card .highlight { color: #a78bfa; font-weight: 600; }
+  .note-card code {
+    font-family: 'SF Mono', monospace;
+    font-size: 11px;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: #81e6d9;
+  }
+
+  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 99px;
+    font-weight: 600;
+  }
+  .badge-green { background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+  .badge-purple { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1px solid rgba(124,58,237,0.25); }
+  .badge-gray { background: #1e1e1e; color: #666; border: 1px solid #2a2a2a; }
+</style>
+</head>
+<body>
+
+<h1>Help page — telegra.ph preview + implementation notes</h1>
+<p class="subtitle">Left: how it'll look on telegra.ph &nbsp;·&nbsp; Right: implementation decisions</p>
+
+<div class="outer">
+
+  <!-- telegra.ph mockup -->
+  <div class="telegraph-frame">
+    <div class="telegraph-bar">
+      <div class="dot dot-r"></div>
+      <div class="dot dot-y"></div>
+      <div class="dot dot-g"></div>
+      <div class="url-bar">telegra.ph/Allow-SwiftDrop-popups</div>
+    </div>
+    <div class="telegraph-body">
+      <div class="tg-title">Allowing SwiftDrop to open new tabs</div>
+      <div class="tg-author">SwiftDrop · swiftdrop.pages.dev</div>
+      <div class="tg-body">
+        <p>Some browsers block websites from automatically opening new tabs or windows as a security precaution.</p>
+        <p>SwiftDrop uses this to instantly open URLs sent from another device. You can always click <strong>Retry</strong> in the prompt to open the link manually — but if you want it to open automatically every time, allow pop-ups for SwiftDrop in your browser settings.</p>
+
+        <h3>How to allow pop-ups</h3>
+        <ol>
+          <li>Click the <strong>icon in your address bar</strong> (usually a blocked pop-up icon, or the site settings/padlock icon).</li>
+          <li>Find <strong>"Pop-ups and redirects"</strong> or <strong>"Always allow pop-ups from this site."</strong></li>
+          <li>Set it to <strong>Allow</strong> and reload the page if prompted.</li>
+        </ol>
+
+        <div class="screenshot-placeholder">
+          <div class="icon">🖼️</div>
+          <strong style="color:#6678cc">Your screenshot goes here</strong>
+          <p>Upload allow-new-tab.png directly in the telegra.ph editor</p>
+        </div>
+
+        <div class="tip">
+          <strong>Already blocked?</strong> Just click Retry in the SwiftDrop prompt — it always works. Changing the setting only prevents the prompt from appearing next time.
+        </div>
+
+        <p style="font-size:13px;color:#999;font-family:-apple-system,sans-serif;">After enabling, press Retry or reload SwiftDrop and try again.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Implementation notes -->
+  <div class="notes">
+
+    <div class="note-card">
+      <h4>Help page hosting</h4>
+      <p><span class="highlight">telegra.ph</span> — external, no Worker complexity. You create it once, upload the screenshot directly in the editor, done. Can update content anytime without a deploy.</p>
+      <div class="badge-row">
+        <span class="badge badge-green">✓ My recommendation</span>
+        <span class="badge badge-gray">No code changes needed</span>
+      </div>
+    </div>
+
+    <div class="note-card">
+      <h4>Screenshot image</h4>
+      <p>Upload <code>allow-new-tab.png</code> directly inside the telegra.ph editor (drag onto the page). No Imgur/Catbox needed. telegra.ph hosts it for free.</p>
+      <div class="badge-row">
+        <span class="badge badge-green">✓ One-stop</span>
+      </div>
+    </div>
+
+    <div class="note-card">
+      <h4>Modal backdrop</h4>
+      <p>The modal will sit on top of a semi-transparent overlay (<code>rgba(0,0,0,0.5)</code>) that covers the whole page — so it reads as a true blocking dialog, not a toast.</p>
+    </div>
+
+    <div class="note-card">
+      <h4>Detection strategy</h4>
+      <p>Drop <code>noopener</code> from <code>window.open()</code>. Check return value — <code>null</code> means blocked, show modal. Non-null means tab opened, show nothing. Retry click = user gesture = always succeeds.</p>
+      <div class="badge-row">
+        <span class="badge badge-purple">Minor security trade-off</span>
+        <span class="badge badge-gray">Accepted</span>
+      </div>
+    </div>
+
+    <div class="note-card">
+      <h4>Affected code</h4>
+      <p>Two call sites: <code>line 4031</code> (P2P direct) and <code>line 4345</code> (cloud relay fallback). Both get the same treatment. <code>showUrlToast()</code> gets replaced entirely.</p>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

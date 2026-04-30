@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocked Popup Modal — Design Options</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f0f;
+    color: #f0f0f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  h1 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 28px; }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+
+  .option-card {
+    border: 2px solid #2a2a2a;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+    background: #1a1a1a;
+  }
+  .option-card:hover { border-color: #555; transform: translateY(-1px); }
+  .option-card.selected { border-color: #7c3aed; }
+
+  .option-label {
+    background: #222;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid #2a2a2a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .option-label .badge {
+    background: #7c3aed;
+    color: white;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 99px;
+    font-weight: 700;
+  }
+
+  .preview {
+    padding: 14px;
+    background: #111;
+    min-height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* ---- Option A: Minimal glass modal ---- */
+  .modal-a {
+    background: rgba(30,30,30,0.97);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 28px 24px 22px;
+    width: 100%;
+    max-width: 320px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+    backdrop-filter: blur(20px);
+    text-align: center;
+  }
+  .modal-a .icon { font-size: 36px; margin-bottom: 12px; }
+  .modal-a h2 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 8px; line-height: 1.4; }
+  .modal-a p { font-size: 12px; color: #888; line-height: 1.6; margin-bottom: 18px; }
+  .modal-a p a { color: #7c3aed; text-decoration: none; }
+  .modal-a .actions { display: flex; gap: 8px; }
+  .modal-a .btn-retry {
+    flex: 1;
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .modal-a .btn-cancel {
+    flex: 1;
+    background: #2a2a2a;
+    color: #aaa;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 9px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  /* ---- Option B: Solid bold card (VS Code style) ---- */
+  .modal-b {
+    background: #1e1e2e;
+    border: 1px solid #3a3a5a;
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 320px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+  }
+  .modal-b .header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .modal-b .icon-wrap {
+    width: 38px; height: 38px;
+    background: rgba(239,68,68,0.15);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .modal-b h2 { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; line-height: 1.3; }
+  .modal-b .desc { font-size: 12px; color: #8888aa; line-height: 1.6; margin-bottom: 16px; }
+  .modal-b .desc a { color: #818cf8; text-decoration: none; }
+  .modal-b .actions { display: flex; flex-direction: column; gap: 7px; }
+  .modal-b .btn-retry {
+    background: #4f46e5;
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+  .modal-b .btn-cancel {
+    background: transparent;
+    color: #666;
+    border: 1px solid #333;
+    border-radius: 7px;
+    padding: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  /* ---- Option C: Clean centered sheet (like system dialog) ---- */
+  .modal-c {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 24px 20px;
+    width: 100%;
+    max-width: 310px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+    color: #111;
+  }
+  .modal-c .top { text-align: center; margin-bottom: 16px; }
+  .modal-c .icon { font-size: 40px; margin-bottom: 10px; }
+  .modal-c h2 { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 8px; line-height: 1.4; }
+  .modal-c p { font-size: 12px; color: #555; line-height: 1.65; }
+  .modal-c p a { color: #5b21b6; }
+  .modal-c .divider { height: 1px; background: #e5e7eb; margin: 16px 0; }
+  .modal-c .actions { display: flex; gap: 8px; }
+  .modal-c .btn-retry {
+    flex: 1;
+    background: #5b21b6;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .modal-c .btn-cancel {
+    flex: 1;
+    background: #f3f4f6;
+    color: #374151;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .option-desc {
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+    border-top: 1px solid #2a2a2a;
+  }
+
+  .selection-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(20,20,20,0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid #2a2a2a;
+    padding: 12px 24px;
+    font-size: 13px;
+    color: #888;
+    text-align: center;
+    display: none;
+  }
+  .selection-bar.visible { display: block; color: #a78bfa; }
+</style>
+</head>
+<body>
+<h1>Blocked popup modal — pick a style</h1>
+<p class="subtitle">Click a card to select. Let me know what you think in the terminal too.</p>
+
+<div class="options-grid">
+
+  <!-- Option A -->
+  <div class="option-card" id="opt-a" onclick="select('a', this)">
+    <div class="option-label">A <span class="badge">My pick</span></div>
+    <div class="preview">
+      <div class="modal-a">
+        <div class="icon">🚫</div>
+        <h2>Browser blocked opening a new tab</h2>
+        <p>Press <strong>Retry</strong> to try again, or allow pop-ups for this site in your <a href="#">browser settings →</a></p>
+        <div class="actions">
+          <button class="btn-retry">Retry</button>
+          <button class="btn-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="option-desc">Glass/blur card · dark-themed · centered · icon on top · side-by-side buttons</div>
+  </div>
+
+  <!-- Option B -->
+  <div class="option-card" id="opt-b" onclick="select('b', this)">
+    <div class="option-label">B</div>
+    <div class="preview">
+      <div class="modal-b">
+        <div class="header">
+          <div class="icon-wrap">🚫</div>
+          <div>
+            <h2>Tab blocked by browser</h2>
+          </div>
+        </div>
+        <div class="desc">
+          Press <strong style="color:#e2e8f0">Retry</strong> to try again.<br><br>
+          Please allow pop-ups for this site in your <a href="#">browser settings →</a>
+        </div>
+        <div class="actions">
+          <div class="btn-retry">↻ Retry</div>
+          <div class="btn-cancel">Cancel</div>
+        </div>
+      </div>
+    </div>
+    <div class="option-desc">Solid dark card · indigo accent · left-aligned icon · stacked buttons</div>
+  </div>
+
+  <!-- Option C -->
+  <div class="option-card" id="opt-c" onclick="select('c', this)">
+    <div class="option-label">C</div>
+    <div class="preview" style="background:#555;">
+      <div class="modal-c">
+        <div class="top">
+          <div class="icon">🚫</div>
+          <h2>Browser blocked a new tab</h2>
+          <p>Press <strong>Retry</strong> to try again. Please allow pop-ups for this site in your <a href="#">browser settings →</a></p>
+        </div>
+        <div class="divider"></div>
+        <div class="actions">
+          <button class="btn-retry">Retry</button>
+          <button class="btn-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="option-desc">Light/white card · system dialog feel · purple accent · centered</div>
+  </div>
+
+</div>
+
+<div class="selection-bar" id="sel-bar"></div>
+
+<script>
+  let selected = null;
+  function select(id, el) {
+    document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selected = id;
+    const bar = document.getElementById('sel-bar');
+    const labels = { a: 'Option A — Glass dark card', b: 'Option B — Solid dark card', c: 'Option C — Light system dialog' };
+    bar.textContent = '✓ Selected: ' + labels[id] + ' — let me know in the terminal!';
+    bar.classList.add('visible');
+
+    // Try to emit event for state_dir
+    try {
+      fetch('/__select', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type:'click', choice: id, text: labels[id], timestamp: Date.now()})
+      }).catch(()=>{});
+    } catch(e){}
+  }
+</script>
+</body>
+</html>
