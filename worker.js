@@ -2333,6 +2333,7 @@ function getHTML(env) {
       align-items: center;
       gap: 6px;
       font-size: 14px;
+      color: var(--text-primary);
     }
     .nearby-edit-btn {
       background: none;
@@ -2450,7 +2451,7 @@ function getHTML(env) {
     }
     body.dark-mode .nearby-request-content { background: #1e1e2e; }
     .nearby-request-icon { font-size: 36px; margin-bottom: 8px; }
-    .nearby-request-from { font-weight: 700; font-size: 17px; margin-bottom: 4px; }
+    .nearby-request-from { font-weight: 700; font-size: 17px; margin-bottom: 4px; color: var(--text-primary); }
     .nearby-request-file { font-size: 14px; color: var(--text-secondary); word-break: break-all; }
     .nearby-request-size { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; }
     .nearby-request-actions { display: flex; gap: 10px; justify-content: center; }
@@ -3181,7 +3182,7 @@ function getHTML(env) {
           </div>
           <div class="nearby-name-edit">
             <span id="nearbyNameDisplay"></span>
-            <button class="nearby-edit-btn" id="nearbyEditNameBtn" title="Edit name">✏</button>
+            <button class="nearby-edit-btn" id="nearbyEditNameBtn" title="Edit name"><i data-feather="edit-2" style="width:14px;height:14px;stroke-width:2.5;pointer-events:none;"></i></button>
           </div>
         </div>
         <div class="settings-row" id="nearbyNameInputRow" style="display:none;">
