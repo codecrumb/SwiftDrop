@@ -112,7 +112,7 @@ export default {
     // intercepts it and stashes the files in Cache Storage. As a graceful
     // fallback we redirect to the home page so the user can still send manually.
     if (url.pathname === '/share' && request.method === 'POST') {
-      return Response.redirect(new URL('/?shared=unavailable', request.url).toString(), 303);
+      return Response.redirect(`${url.origin}/?shared=unavailable`, 303);
     }
 
     // WebSocket upgrade for signaling
