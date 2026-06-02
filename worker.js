@@ -1318,8 +1318,9 @@ function getHTML(env) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#667eea">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#667eea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1e1b4b" media="(prefers-color-scheme: dark)">
   <title>SwiftDrop - P2P File Transfer</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="https://faviconser.pages.dev/swiftdrop/favicon.ico">
@@ -1385,11 +1386,14 @@ function getHTML(env) {
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-right: max(20px, env(safe-area-inset-right));
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+      padding-left: max(20px, env(safe-area-inset-left));
       transition: background 0.3s ease;
     }
 
