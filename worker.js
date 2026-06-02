@@ -3611,9 +3611,9 @@ function getHTML(env) {
     changeRoomBtn.addEventListener('click', () => {
       // Disconnect from current room
       if (ws) {
-        isIntentionalClose = true;
+        ws.onclose = null;
+        ws.onerror = null;
         ws.close();
-        isIntentionalClose = false;
         ws = null;
       }
       roomCode = null;
@@ -4110,6 +4110,24 @@ function getHTML(env) {
     }
     
     function connectWebSocket(room, isReconnect = false) {
+      // Prevent the outgoing ws's onclose from triggering a reconnect to the old room.
+      // Without this, intentional closes (joinBtn, changeRoom, etc.) still fire onclose
+      // after isIntentionalClose is reset, causing a stale reconnect loop that exhausts
+      // wsReconnectAttempts and shows "Connection lost" on the new room.
+      if (ws) {
+        ws.onclose = null;
+        ws.onerror = null;
+      }
+
+      // Always cancel any pending retry — we're opening a new connection right now.
+      // This also prevents a stale scheduled retry from clobbering the new ws's handlers.
+      clearTimeout(wsReconnectTimeout);
+      wsReconnectTimeout = null;
+
+      if (!isReconnect) {
+        wsReconnectAttempts = 0;
+      }
+
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(\`\${protocol}//\${window.location.host}/ws?room=\${room}\`);
 
@@ -5187,9 +5205,9 @@ function getHTML(env) {
           if (transferInProgress) return;
 
           if (ws && ws.readyState <= WebSocket.OPEN) {
-            isIntentionalClose = true;
+            ws.onclose = null;
+            ws.onerror = null;
             ws.close();
-            isIntentionalClose = false;
           }
 
           nearbyDisconnect();
