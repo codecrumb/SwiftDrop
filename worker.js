@@ -7,6 +7,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Enforce HTTPS. Redirecting here means WebSocket connections always use
+    // wss:// (because the page itself is loaded over HTTPS) and mobile browsers
+    // don't show the "not secure" warning.
+    if (url.protocol === 'http:') {
+      return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
+    }
+
     // Manual cleanup trigger (protected with API key)
     if (url.pathname === '/cleanup' && request.method === 'POST') {
       // Require API key for manual cleanup
