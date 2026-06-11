@@ -1,11 +1,17 @@
 // ── Nearby: Device Identity ──────────────────────────────────────────
     const NEARBY_ADJECTIVES = [
       'Swift','Quick','Bright','Cool','Bold','Calm','Keen','Wise','Fast','Smart',
-      'Sharp','Brave','Steady','Quiet','Lively','Merry','Nimble','Jolly','Proud','Vivid'
+      'Sharp','Brave','Steady','Quiet','Lively','Merry','Nimble','Jolly','Proud','Vivid',
+      'Eager','Sunny','Witty','Noble','Fierce','Gentle','Spry','Daring','Lucky','Zippy',
+      'Crafty','Peppy','Sleek','Snappy','Deft','Zesty','Nifty','Sly','Gritty','Sassy',
+      'Cheeky','Breezy','Perky','Crisp','Grand','Plucky','Dapper','Stout','Dandy','Sprightly'
     ];
     const NEARBY_ANIMALS = [
       'Penguin','Otter','Fox','Hawk','Wolf','Bear','Eagle','Tiger','Lion','Panda',
-      'Rabbit','Falcon','Jaguar','Lynx','Moose','Raven','Seal','Whale','Zebra','Crane'
+      'Rabbit','Falcon','Jaguar','Lynx','Moose','Raven','Seal','Whale','Zebra','Crane',
+      'Badger','Bison','Cobra','Condor','Coyote','Dingo','Dolphin','Ferret','Gecko','Gorilla',
+      'Heron','Ibis','Kestrel','Koala','Lemur','Leopard','Mink','Narwhal','Ocelot','Osprey',
+      'Parrot','Peacock','Puffin','Quail','Rhino','Sloth','Stork','Toucan','Viper','Weasel'
     ];
 
     function nearbyGenerateName() {
