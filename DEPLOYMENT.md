@@ -243,7 +243,7 @@ Monitor your usage in Cloudflare dashboard:
 ### Deploy New Version
 
 ```bash
-# Make changes to worker.js
+# Make changes to worker.js (backend) or public/ (UI)
 # Test locally first
 wrangler dev
 

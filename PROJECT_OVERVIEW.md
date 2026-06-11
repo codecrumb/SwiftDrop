@@ -34,20 +34,20 @@ A complete, production-ready peer-to-peer file transfer application with automat
 
 ### Core Application Files
 
-#### `worker.js` (Main Application)
-**Size:** ~550 lines of code  
+#### `worker.js` (Backend)
+**Size:** ~970 lines of code  
 **Contains:**
 - Cloudflare Worker request handler
 - Durable Object class for signaling
-- Complete HTML/CSS/JS UI embedded
 - R2 upload endpoint (`POST /upload`)
 - R2 download endpoint (`GET /download/:id`)
 - WebSocket upgrade handler (`GET /ws?room=...`)
+- Config endpoint (`GET /api/config` — serves Turnstile site key)
 
 **Key Components:**
 ```javascript
 // Worker routes
-GET  /               → Serves UI
+GET  /api/config     → Turnstile site key (JSON)
 GET  /ws?room=...    → WebSocket signaling
 POST /upload         → R2 fallback upload
 GET  /download/:id   → R2 fallback download
@@ -58,14 +58,17 @@ class SignalingRoom {
   - Routes WebRTC messages
   - Handles peer join/leave
 }
-
-// Client-side logic (embedded in HTML)
-- WebRTC PeerConnection setup
-- DataChannel file transfer
-- Automatic P2P timeout
-- R2 fallback handling
-- Progress tracking
 ```
+
+#### `public/` (Static UI)
+Served via Workers Static Assets (`[assets]` in `wrangler.toml`).  
+**Contains:**
+- `index.html` — app shell
+- `styles.css` — all styling
+- `app.js` — WebRTC, DataChannel, UI logic, ICE config, P2P timeout
+- `sw.js` — service worker
+- `manifest.webmanifest` — PWA manifest
+- `help/popups.html` — help overlay
 
 #### `wrangler.toml` (Configuration)
 **Contains:**

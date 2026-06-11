@@ -51,9 +51,10 @@ This opens your browser to authorize Wrangler.
 
 ### 4. Clone/Download Files
 
-You need these 2 files:
-- `worker.js` - Main application code
+You need these files:
+- `worker.js` - Backend (APIs, WebSockets, Durable Objects, R2, cron)
 - `wrangler.toml` - Configuration
+- `public/` - Static UI (HTML, CSS, JS, service worker, manifest)
 
 ### 5. Update Configuration
 
@@ -171,7 +172,7 @@ wrangler tail  # Live logs
 
 ### Update Code
 ```bash
-# Edit worker.js
+# Edit worker.js (backend) or files in public/ (UI)
 wrangler deploy  # Redeploy
 ```
 
@@ -202,8 +203,15 @@ wrangler deploy  # Redeploy
 
 ```
 swiftdrop/
-├── worker.js          # Main application (Backend + Frontend)
+├── worker.js          # Backend (APIs, WebSockets, Durable Objects, R2, cron)
 ├── wrangler.toml      # Cloudflare configuration
+├── public/            # Static UI (served via Workers Static Assets)
+│   ├── index.html
+│   ├── styles.css
+│   ├── app.js
+│   ├── sw.js
+│   ├── manifest.webmanifest
+│   └── help/popups.html
 ├── README.md          # Full documentation
 ├── DEPLOYMENT.md      # Detailed deployment guide
 ├── TROUBLESHOOTING.md # Debug common issues

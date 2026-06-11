@@ -44,22 +44,26 @@ A modern, serverless file-sharing application built on Cloudflare Workers that p
 ### Components
 
 1. **Cloudflare Worker** (`worker.js`)
-   - Serves the HTML/CSS/JS UI
    - Handles WebSocket upgrade requests
    - Manages R2 upload/download endpoints
+   - Serves `/api/config` (Turnstile site key) and TURN credentials
 
-2. **Durable Object** (`SignalingRoom`)
+2. **Static UI** (`public/`)
+   - `index.html`, `styles.css`, `app.js`, `sw.js`, `manifest.webmanifest`, `help/popups.html`
+   - Served via Workers Static Assets (`[assets]` in `wrangler.toml`)
+
+3. **Durable Object** (`SignalingRoom`)
    - One instance per room code
    - Manages WebSocket connections
    - Routes WebRTC signaling messages between peers
    - Handles peer join/leave events
 
-3. **R2 Bucket** (`swiftdrop-files`)
+4. **R2 Bucket** (`swiftdrop-files`)
    - Fallback storage for files when P2P fails
    - 24-hour expiration on stored files
    - Metadata tracking (uploader, timestamp, filename)
 
-4. **Client-Side Logic**
+5. **Client-Side Logic** (`public/app.js`)
    - WebRTC PeerConnection management
    - DataChannel file transfer with chunking
    - Automatic fallback detection and handling

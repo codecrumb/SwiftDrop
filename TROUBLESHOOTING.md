@@ -131,7 +131,7 @@ fetch('https://stun.l.google.com:19302')
 
 1. **Add more STUN servers:**
 ```javascript
-// In worker.js CONFIG
+// In public/app.js CONFIG
 iceServers: [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
@@ -154,7 +154,7 @@ iceServers: [
 
 3. **Increase timeout:**
 ```javascript
-// In worker.js CONFIG
+// In public/app.js CONFIG
 p2pTimeout: 10000, // 10 seconds instead of 5
 ```
 
