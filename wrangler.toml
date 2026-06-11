@@ -4,6 +4,14 @@ compatibility_date = "2024-11-24"
 main = "worker.js"
 preview_urls = true
 
+# Static UI served from public/. run_worker_first keeps the worker's
+# HTTP->HTTPS redirect on the HTML route (workers.dev has no zone-level
+# "Always Use HTTPS"); all other assets are served directly and free.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/", "/index.html"]
+
 # Durable Object for WebSocket signaling
 [[durable_objects.bindings]]
 name = "ROOMS"

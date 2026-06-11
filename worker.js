@@ -69,46 +69,21 @@ export default {
       }
     }
 
-    // Serve the UI
+    // Public client config. Turnstile site keys are public by design, but
+    // serving from env (not hardcoding in the static HTML) means rotation
+    // never requires a code change.
+    if (url.pathname === '/api/config') {
+      return new Response(JSON.stringify({
+        turnstileSiteKey: env.TURNSTILE_SITE_ID || ''
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Serve the UI (static asset; run_worker_first routes it through here
+    // so the HTTPS redirect above applies)
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      return new Response(getHTML(env), {
-        headers: {
-          'Content-Type': 'text/html;charset=UTF-8',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
-    }
-
-    // Help page: allowing pop-ups
-    if (url.pathname === '/help/popups' && request.method === 'GET') {
-      return new Response(getHelpPage(), {
-        headers: {
-          'Content-Type': 'text/html;charset=UTF-8',
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
-    }
-
-    // PWA manifest (Android Web Share Target needs same-origin manifest + SW)
-    if (url.pathname === '/manifest.webmanifest' && request.method === 'GET') {
-      return new Response(getManifest(), {
-        headers: {
-          'Content-Type': 'application/manifest+json;charset=UTF-8',
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
-    }
-
-    // Service worker (must be served from same origin with scope /)
-    if (url.pathname === '/sw.js' && request.method === 'GET') {
-      return new Response(getServiceWorker(), {
-        headers: {
-          'Content-Type': 'application/javascript;charset=UTF-8',
-          // Browsers require a short-lived SW response so updates are picked up
-          'Cache-Control': 'no-cache',
-          'Service-Worker-Allowed': '/'
-        }
-      });
+      return env.ASSETS.fetch(request);
     }
 
     // Same-origin icon proxy for PWA install + share target
