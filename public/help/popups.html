@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Allowing pop-ups — SwiftDrop</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f9fafb;
+    --card-bg: #ffffff;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --text-tertiary: #9ca3af;
+    --border: #e5e7eb;
+    --accent: #4f46e5;
+    --accent-soft: rgba(79,70,229,0.08);
+    --warn-bg: rgba(245,158,11,0.10);
+    --warn-stroke: #d97706;
+    --tip-bg: #f0f4ff;
+    --tip-border: #4f46e5;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1f2937;
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --text-tertiary: #6b7280;
+      --border: #374151;
+      --accent: #818cf8;
+      --accent-soft: rgba(129,140,248,0.1);
+      --warn-bg: rgba(251,191,36,0.12);
+      --warn-stroke: #fbbf24;
+      --tip-bg: rgba(79,70,229,0.12);
+      --tip-border: #6366f1;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 48px 16px 64px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 36px 32px;
+    max-width: 560px;
+    width: 100%;
+    height: fit-content;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-icon svg { width: 16px; height: 16px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .brand-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .warn-badge {
+    width: 40px; height: 40px; flex-shrink: 0;
+    background: var(--warn-bg);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .warn-badge svg {
+    width: 20px; height: 20px;
+    stroke: var(--warn-stroke); fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  h1 { font-size: 20px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
+  .page-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+
+  .section { margin-top: 24px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--text-tertiary); margin-bottom: 12px;
+  }
+
+  ol { padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  ol li {
+    display: flex; align-items: flex-start; gap: 12px;
+    font-size: 14px; color: var(--text-secondary); line-height: 1.6;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    background: var(--accent-soft);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    margin-top: 2px;
+  }
+  ol li strong { color: var(--text-primary); }
+
+  .screenshot {
+    margin-top: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .screenshot img {
+    width: 100%;
+    display: block;
+  }
+
+  .tip {
+    margin-top: 20px;
+    background: var(--tip-bg);
+    border-left: 3px solid var(--tip-border);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .tip strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24"><path d="M22 2L11 13"></path><path d="M22 2L15 22 11 13 2 9l20-7z"></path></svg>
+    </div>
+    <span class="brand-name">SwiftDrop</span>
+  </div>
+
+  <div class="page-header">
+    <div class="warn-badge">
+      <svg viewBox="0 0 24 24">
+        <polygon points="10.29 3.86 1.82 18 22.18 18 13.71 3.86 10.29 3.86"></polygon>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+    </div>
+    <div>
+      <h1>Allowing SwiftDrop to open new tabs</h1>
+      <p class="page-desc">Some browsers block websites from automatically opening new tabs as a security precaution.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">How to allow pop-ups</div>
+    <ol>
+      <li>
+        <div class="step-num">1</div>
+        <div>Click the <strong>icon in your address bar</strong> — usually a blocked pop-up icon or the site settings padlock.</div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div>Find <strong>"Pop-ups and redirects"</strong> or <strong>"Always allow pop-ups from this site"</strong> and set it to <strong>Allow</strong>.</div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div>Reload the page if prompted, then press <strong>Retry</strong> in SwiftDrop.</div>
+      </li>
+    </ol>
+  </div>
+
+  <div class="screenshot">
+    <img src="https://i.imgur.com/8LQP8oS.png" alt="Screenshot showing how to allow pop-ups in browser settings">
+  </div>
+
+  <div class="tip">
+    <strong>Just want it to work now?</strong> Close this tab and click <strong>Retry</strong> in the SwiftDrop prompt — it always opens the link, no settings change needed. Adjusting the setting only prevents the prompt from appearing next time.
+  </div>
+</div>
+</body>
+</html>

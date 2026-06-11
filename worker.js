@@ -5815,3 +5815,6 @@ function getHTML(env) {
 </body>
 </html>`;
 }
+
+// TEMP: for scripts/extract-ui.mjs — removed after extraction
+export { getHTML, getHelpPage, getManifest, getServiceWorker };

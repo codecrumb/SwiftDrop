@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#667eea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1e1b4b" media="(prefers-color-scheme: dark)">
+  <title>SwiftDrop - P2P File Transfer</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="https://faviconser.pages.dev/swiftdrop/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://faviconser.pages.dev/swiftdrop/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://faviconser.pages.dev/swiftdrop/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://faviconser.pages.dev/swiftdrop/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://faviconser.pages.dev/swiftdrop/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="https://faviconser.pages.dev/swiftdrop/icon-512.png">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/feather-icons/dist/feather.min.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <!-- Full-page drag overlay -->
+  <div id="dragOverlay">
+    <div class="drag-overlay-icon">📁</div>
+    <div class="drag-overlay-text">Drop your file anywhere!</div>
+    <div class="drag-overlay-sub">Release to select this file</div>
+  </div>
+
+  <div class="container">
+    <div class="left-panel">
+      <h1>🚀 SwiftDrop</h1>
+      <p class="subtitle">Instant P2P file transfer • Files auto-delete after download</p>
+
+      <div class="status" id="status">
+        <div id="statusText">Generating room code...</div>
+        <div class="room-code" id="roomCode">------</div>
+        <div class="status-badge badge-waiting" id="statusBadge">
+          <span class="status-icon">⏳</span>
+          <span class="status-text">Waiting for peer...</span>
+        </div>
+      </div>
+
+      <!-- Inline QR + copy link (desktop sender only) -->
+      <div class="qr-inline-wrapper" id="qrInlineWrapper" style="display:none;">
+        <div id="qrInlineCode"></div>
+      </div>
+
+      <!-- Receive mode state (desktop only) -->
+      <div class="left-receive-state" id="leftReceiveState" style="display:none;">
+        <div class="left-receive-icon">📡</div>
+        <div class="left-receive-title">Ready to Receive</div>
+        <div class="left-receive-sub">Enter the code from the sender's screen</div>
+      </div>
+
+      <div class="toolbar">
+        <a class="github-link" href="https://github.com/codecrumb/SwiftDrop" target="_blank" rel="noopener" title="View on GitHub">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        </a>
+        <button class="settings-btn" id="settingsBtn" title="Settings"><i data-feather="settings"></i></button>
+        <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode"><i data-feather="moon"></i></button>
+      </div>
+    </div>
+
+    <div class="right-panel">
+    <div class="role-selector">
+      <button class="role-btn active" id="sendRoleBtn">📤 Send</button>
+      <button class="role-btn nearby-tab-btn" id="nearbyRoleBtn" style="display:none;">📡 Nearby</button>
+      <button class="role-btn" id="receiveRoleBtn">📥 Receive</button>
+    </div>
+    <p class="role-hint" id="roleHint">Share your room code with the other device</p>
+    <div class="send-type-selector" id="sendTypeSelector">
+      <button class="send-type-btn active" id="sendModeBtn">📁 File</button>
+      <button class="send-type-btn" id="urlModeBtn">🔗 URL</button>
+      <button class="send-type-btn" id="textModeBtn">📋 Text</button>
+    </div>
+    
+    <!-- Send Mode -->
+    <div class="section active" id="sendSection">
+      <div class="upload-area" id="uploadArea">
+        <div class="upload-icon">📁</div>
+        <p><strong>Click or drag to select files</strong></p>
+        <p style="font-size: 12px; color: #999; margin-top: 5px;">Direct P2P transfer</p>
+      </div>
+      <input type="file" id="fileInput" multiple>
+      
+      <div class="file-info" id="fileInfo">
+        <div class="file-list" id="fileList"></div>
+        <div class="file-name" id="fileName" style="display:none;"></div>
+        <div class="file-size" id="fileSize" style="display:none;"></div>
+      </div>
+      
+      <button class="btn btn-waiting" id="sendBtn" disabled>Waiting for receiver...</button>
+    </div>
+    
+    <!-- URL Mode -->
+    <div class="section" id="urlSection">
+      <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter URL to share:</p>
+      <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+        <input type="url" id="urlInput" placeholder="https://example.com" inputmode="url"
+               style="flex: 1; text-transform: none; letter-spacing: normal; margin-bottom: 0;">
+        <button id="pasteUrlBtn" class="paste-btn">
+          📋 Paste
+        </button>
+      </div>
+      <button class="btn btn-waiting" id="sendUrlBtn" disabled>Waiting for receiver...</button>
+      <p style="margin-top: 10px; font-size: 12px; color: #999; text-align: center;">
+        Receiver will be redirected to this URL
+      </p>
+    </div>
+    
+    <!-- Text Mode -->
+    <div class="section" id="textSection">
+      <p style="margin-bottom: 10px; color: var(--text-secondary); font-size: 14px;">Paste or type text to share:</p>
+      <textarea class="text-input" id="textInput" placeholder="Paste your text here (env vars, snippets, notes...)"></textarea>
+      <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <button id="pasteTextBtn" class="paste-btn" style="flex: 1;">📋 Paste</button>
+        <button id="clearTextBtn" class="paste-btn" style="flex: 1;">✕ Clear</button>
+      </div>
+      <button class="btn btn-waiting" id="sendTextBtn" disabled style="margin-top: 10px;">Waiting for receiver...</button>
+    </div>
+
+    <!-- Nearby Mode -->
+    <div class="section" id="nearbySection">
+      <div class="nearby-identity-row">
+        <span class="nearby-identity-label">You appear as:</span>
+        <span class="nearby-identity-name" id="nearbyIdentityName" title="Tap to rename"></span>
+        <input type="text" id="nearbyIdentityInput" class="nearby-identity-input" maxlength="30" style="display:none;">
+      </div>
+      <div class="nearby-peer-list" id="nearbyPeerList">
+        <div class="nearby-empty" id="nearbyEmpty">
+          <div style="font-size:32px; margin-bottom:8px;">📡</div>
+          <div style="font-weight:600; margin-bottom:4px;">Looking for devices…</div>
+          <div style="font-size:13px; color:var(--text-secondary);">Other devices on this network will appear here</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Receive Mode -->
+    <div class="section" id="receiveSection">
+      <div id="receiveJoinForm">
+        <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter the 6-digit code from sender:</p>
+        <input type="text" id="roomInput" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+        <button class="btn" id="joinBtn">Join Room</button>
+      </div>
+      <div id="receiveJoinedState" style="display:none; text-align:center; padding: 12px 0;">
+        <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
+        <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">Connected to room <span id="receiveJoinedCode"></span></div>
+        <div style="font-size: 13px; color: #888;">Waiting for sender to transfer files…</div>
+        <button id="changeRoomBtn" style="margin-top: 10px; background: none; border: none; color: #888; font-size: 12px; cursor: pointer; text-decoration: underline; padding: 0;">Wrong room? Change</button>
+      </div>
+    </div>
+    
+    <div class="progress" id="progress">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-text" id="progressText">Transferring...</div>
+    </div>
+    
+    <!-- Receive success panel (replaces right panel on transfer complete) -->
+    <div class="receive-success" id="receiveSuccessPanel">
+      <div class="success-icon" id="successIcon">📦</div>
+      <div class="success-title" id="successTitle">File Ready!</div>
+      <div class="success-meta" id="successMeta"></div>
+      <!-- File: download button(s) — populated dynamically -->
+      <div class="success-actions" id="successFileActions" style="display:none;"></div>
+      <!-- Text: textarea + copy -->
+      <div class="success-actions" id="successTextActions" style="display:none;">
+        <textarea class="success-textarea" id="successTextDisplay" readonly></textarea>
+        <button class="btn" id="successCopyBtn">📋 Copy to Clipboard</button>
+      </div>
+      <div class="telehost-promo" id="telehostPromo" style="width:100%;">
+        Need permanent file hosting? Try <a href="https://telehost.pages.dev" target="_blank" rel="noopener">TeleHost</a> — free &amp; forever.
+      </div>
+      <button class="btn-reset" id="successResetBtn">↩ Transfer Another</button>
+    </div>
+
+    <div class="error" id="error"></div>
+    </div><!-- /right-panel -->
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="popup-overlay" id="popupOverlay"></div>
+  <div class="popup-modal" id="popupModal" role="dialog" aria-modal="true" aria-labelledby="popupModalTitle" aria-describedby="popupModalDesc">
+    <div class="popup-modal-header">
+      <div class="popup-modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="10.29 3.86 1.82 18 22.18 18 13.71 3.86 10.29 3.86"></polygon>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <h2 class="popup-modal-title" id="popupModalTitle">Pop-up blocked</h2>
+    </div>
+    <p class="popup-modal-body" id="popupModalDesc">Your browser blocked a new tab from opening. Click <strong>Retry</strong> to open it.</p>
+    <div class="popup-modal-actions">
+      <button class="popup-modal-retry" id="popupRetry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
+          <polyline points="1 4 1 10 7 10"></polyline>
+          <path d="M3.51 15a9 9 0 1 0 .49-3.7"></path>
+        </svg>
+        Retry
+      </button>
+      <button class="popup-modal-cancel" id="popupCancel">Cancel</button>
+    </div>
+    <div class="popup-modal-footer">
+      Tired of seeing this? <a href="/help/popups" target="_blank" rel="noopener">Adjust browser settings →</a>
+    </div>
+  </div>
+
+  <!-- Turnstile Widget (invisible, for cloud uploads only) -->
+  <div class="cf-turnstile"
+       id="turnstileWidget"
+       data-sitekey=""
+       data-theme="light"
+       data-size="invisible"
+       data-callback="onTurnstileSuccess"
+       style="display:none;">
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="settings-modal" id="settingsModal">
+    <div class="settings-modal-content">
+      <button class="settings-modal-close" id="settingsModalClose">✕</button>
+      <div class="settings-modal-title">Settings</div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Auto-copy text</span>
+          <span class="settings-desc">Automatically copy received text to clipboard</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="autoCopyToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Auto-download files</span>
+          <span class="settings-desc">Automatically download files when received</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="autoDownloadToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Auto-join on code entry</span>
+          <span class="settings-desc">Automatically join when the 6th digit is typed (no need to tap Join)</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="autoJoinToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Keep screen awake during transfers</span>
+          <span class="settings-desc">Prevent the screen from dimming while a file transfer is in progress</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="keepScreenAwakeToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+      <div class="settings-section-header">
+        Nearby Devices <span class="settings-beta-badge">Beta</span>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">
+          <span>Enable Nearby Discovery</span>
+          <span class="settings-desc">Find devices on the same network without a room code</span>
+        </div>
+        <label class="settings-toggle">
+          <input type="checkbox" id="nearbyEnabledToggle">
+          <span class="settings-toggle-slider"></span>
+        </label>
+      </div>
+      <div id="nearbySettingsExpanded" style="display:none;">
+        <div class="settings-row">
+          <div class="settings-label">
+            <span>Your device name</span>
+            <span class="settings-desc">How you appear to nearby devices</span>
+          </div>
+          <div class="nearby-name-edit">
+            <span id="nearbyNameDisplay"></span>
+            <button class="nearby-edit-btn" id="nearbyEditNameBtn" title="Edit name"><i data-feather="edit-2" style="width:14px;height:14px;stroke-width:2.5;pointer-events:none;"></i></button>
+          </div>
+        </div>
+        <div class="settings-row" id="nearbyNameInputRow" style="display:none;">
+          <input type="text" id="nearbyNameInput" maxlength="30" placeholder="Enter device name"
+                 style="flex:1; margin:0; font-size:14px;">
+          <button class="nearby-edit-btn" id="nearbyNameSaveBtn">Save</button>
+        </div>
+        <div class="settings-row settings-label" id="nearbyTrustedHeader" style="display:none;">
+          <span style="font-weight:600;">Trusted Devices</span>
+        </div>
+        <div id="nearbyTrustedList"></div>
+      </div>
+      <div class="settings-row settings-github-row">
+        <a href="https://github.com/codecrumb/SwiftDrop" target="_blank" rel="noopener" class="settings-github-link">
+          <svg viewBox="0 0 16 16" aria-hidden="true" width="18" height="18" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR Code Modal -->
+  <div class="qr-modal" id="qrModal">
+    <div class="qr-modal-content">
+      <button class="qr-modal-close" id="qrModalClose">✕</button>
+      <div class="qr-modal-title">Join this room</div>
+      <div class="qr-modal-room-code" id="modalRoomCode">------</div>
+      <div class="qr-modal-qr">
+        <div id="qrcode"></div>
+      </div>
+      <div class="qr-modal-instructions">Scan to join instantly</div>
+    </div>
+  </div>
+
+  <!-- Nearby: Incoming Transfer Request Modal -->
+  <div class="nearby-request-modal" id="nearbyRequestModal" style="display:none;">
+    <div class="nearby-request-content">
+      <div class="nearby-request-icon">📡</div>
+      <div class="nearby-request-from" id="nearbyRequestFrom"></div>
+      <div class="nearby-request-file" id="nearbyRequestFile"></div>
+      <div class="nearby-request-size" id="nearbyRequestSize"></div>
+      <div class="nearby-request-actions">
+        <button class="btn" id="nearbyAcceptBtn">Accept</button>
+        <button class="btn-reset" id="nearbyDeclineBtn">Decline</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cookie Consent Banner -->
+  <div class="cookie-banner" id="cookieBanner">
+    <div class="cookie-banner-content">
+      <div class="cookie-banner-icon">🍪</div>
+      <div class="cookie-banner-text">
+        <div class="cookie-banner-title">Cookie Notice</div>
+        <div class="cookie-banner-message">
+          We use cookies for Turnstile verification to protect against bots. By continuing to use SwiftDrop, you accept our use of cookies.
+        </div>
+        <button class="cookie-banner-close" id="cookieBannerClose">Got it!</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
