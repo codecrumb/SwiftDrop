@@ -9,8 +9,10 @@ export default {
 
     // Enforce HTTPS. Redirecting here means WebSocket connections always use
     // wss:// (because the page itself is loaded over HTTPS) and mobile browsers
-    // don't show the "not secure" warning.
-    if (url.protocol === 'http:') {
+    // don't show the "not secure" warning. Skipped for localhost so
+    // `wrangler dev` (no TLS) keeps working.
+    const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if (url.protocol === 'http:' && !isLocalhost) {
       return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
     }
 
@@ -146,6 +148,10 @@ export default {
 
     // Nearby discovery — WebSocket connection to NearbyLobby
     if (url.pathname === '/nearby') {
+      // Same CSWSH protection as /ws
+      if (!isAllowedWebSocketOrigin(request, env)) {
+        return new Response('Forbidden: origin not allowed', { status: 403 });
+      }
       if (request.headers.get('Upgrade') !== 'websocket') {
         return new Response('Expected WebSocket', { status: 426 });
       }
@@ -471,12 +477,14 @@ function getCorsHeaders(request, env) {
  * otherwise open a WS to our worker and speak as that user.
  *
  * Rules:
- *  - If ALLOWED_ORIGINS is configured, the Origin header MUST be present and
- *    MUST match one of the configured origins.
- *  - If ALLOWED_ORIGINS is not configured, allow the request but match the
- *    worker's origin (same-origin) when an Origin header is present. Requests
- *    without an Origin header (non-browser clients) are allowed in this mode
- *    to preserve current behavior for local/dev setups.
+ *  - Same-origin requests are always allowed (by definition not cross-site),
+ *    so the app keeps working on localhost dev and any new domain pointed at
+ *    the worker without touching ALLOWED_ORIGINS.
+ *  - If ALLOWED_ORIGINS is configured, a cross-origin request MUST match one
+ *    of the configured origins.
+ *  - If ALLOWED_ORIGINS is not configured, requests without an Origin header
+ *    (non-browser clients) are allowed to preserve current behavior for
+ *    local/dev setups.
  */
 function isAllowedWebSocketOrigin(request, env) {
   const origin = request.headers.get('Origin');
@@ -485,18 +493,20 @@ function isAllowedWebSocketOrigin(request, env) {
     .map(o => o.trim())
     .filter(Boolean);
 
+  if (origin) {
+    try {
+      if (origin === new URL(request.url).origin) return true;
+    } catch {
+      return false;
+    }
+  }
+
   if (allowedOrigins.length > 0) {
     return Boolean(origin) && allowedOrigins.includes(origin);
   }
 
-  // No explicit allowlist configured: fall back to same-origin check.
-  if (!origin) return true;
-  try {
-    const requestOrigin = new URL(request.url).origin;
-    return origin === requestOrigin;
-  } catch {
-    return false;
-  }
+  // No explicit allowlist configured: allow non-browser clients (no Origin).
+  return !origin;
 }
 
 /**
@@ -3328,6 +3338,13 @@ function getHTML(env) {
     }
     // ─────────────────────────────────────────────────────────────────────
 
+    // Escape untrusted strings (peer names, file names) before innerHTML use
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
     // Dark Mode
     const darkModeToggle = document.getElementById('darkModeToggle');
     const savedTheme = localStorage.getItem('theme');
@@ -3432,8 +3449,8 @@ function getHTML(env) {
         item.className = 'nearby-trusted-item';
         const daysAgo = Math.floor((Date.now() - t.trustedAt) / 86400000);
         item.innerHTML = \`
-          <span>\${t.displayName} <span style="color:var(--text-secondary);font-size:12px;">· trusted \${daysAgo === 0 ? 'today' : daysAgo + 'd ago'}</span></span>
-          <button class="nearby-trusted-remove" data-id="\${t.deviceId}">Remove</button>
+          <span>\${escapeHtml(t.displayName)} <span style="color:var(--text-secondary);font-size:12px;">· trusted \${daysAgo === 0 ? 'today' : daysAgo + 'd ago'}</span></span>
+          <button class="nearby-trusted-remove" data-id="\${escapeHtml(t.deviceId)}">Remove</button>
         \`;
         item.querySelector('button').addEventListener('click', () => {
           nearbyRevokeTrust(t.deviceId);
@@ -3647,7 +3664,7 @@ function getHTML(env) {
       selectedFiles.forEach((file, i) => {
         const row = document.createElement('div');
         row.className = 'file-row';
-        row.innerHTML = \`<span class="file-row-name" title="\${file.name}">\${file.name}</span><span class="file-row-size">\${formatFileSize(file.size)}</span><button class="file-row-remove" data-index="\${i}" title="Remove">×</button>\`;
+        row.innerHTML = \`<span class="file-row-name" title="\${escapeHtml(file.name)}">\${escapeHtml(file.name)}</span><span class="file-row-size">\${formatFileSize(file.size)}</span><button class="file-row-remove" data-index="\${i}" title="Remove">×</button>\`;
         fileList.appendChild(row);
       });
       fileInfo.style.display = 'block';
@@ -4112,12 +4129,9 @@ function getHTML(env) {
     }
     
     function generateRoomCode() {
-      const chars = '0123456789';
-      let code = '';
-      for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      return code;
+      const digits = new Uint32Array(6);
+      crypto.getRandomValues(digits);
+      return Array.from(digits, (d) => d % 10).join('');
     }
     
     function connectWebSocket(room, isReconnect = false) {
@@ -5260,7 +5274,7 @@ function getHTML(env) {
         item.dataset.deviceId = peer.deviceId;
         item.innerHTML = \`
           <div>
-            <span class="nearby-peer-name">\${peer.displayName}</span>
+            <span class="nearby-peer-name">\${escapeHtml(peer.displayName)}</span>
             \${trusted ? '<span class="nearby-peer-trusted">✓ Trusted</span>' : ''}
           </div>
           <span class="nearby-peer-status">Tap to send</span>
@@ -5410,7 +5424,7 @@ function getHTML(env) {
 
     function nearbyAcceptIncoming() {
       if (!nearbyIncomingRequest) return;
-      const roomCode = Math.random().toString(10).slice(2, 8).padStart(6, '0');
+      const roomCode = generateRoomCode();
       const { fromDeviceId, fromName } = nearbyIncomingRequest;
       // Store peer for trust offer BEFORE clearing
       nearbyLastTransferPeer = { deviceId: fromDeviceId, displayName: fromName };
@@ -5473,7 +5487,7 @@ function getHTML(env) {
       if (nearbyIsTrusted(deviceId)) return; // already trusted
       const toastEl = document.getElementById('toast');
       toastEl.innerHTML = \`
-        Trust <strong>\${displayName}</strong>? Skip confirmation next time.
+        Trust <strong>\${escapeHtml(displayName)}</strong>? Skip confirmation next time.
         <button id="nearbyTrustYes" style="margin-left:10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:13px;">Trust</button>
       \`;
       toastEl.style.display = 'flex';
@@ -5588,18 +5602,18 @@ function getHTML(env) {
     uploadArea.addEventListener('dragover', (e) => {
       e.preventDefault();
       uploadArea.style.borderColor = '#667eea';
-      uploadArea.style.background = '#f8f9ff';
+      uploadArea.style.background = 'var(--upload-area-hover)';
     });
 
     uploadArea.addEventListener('dragleave', (e) => {
       e.preventDefault();
-      uploadArea.style.borderColor = '#ddd';
+      uploadArea.style.borderColor = '';
       uploadArea.style.background = '';
     });
 
     uploadArea.addEventListener('drop', (e) => {
       e.preventDefault();
-      uploadArea.style.borderColor = '#ddd';
+      uploadArea.style.borderColor = '';
       uploadArea.style.background = '';
 
       const files = Array.from(e.dataTransfer.files);
