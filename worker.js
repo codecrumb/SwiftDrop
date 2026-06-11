@@ -76,7 +76,11 @@ export default {
       return new Response(JSON.stringify({
         turnstileSiteKey: env.TURNSTILE_SITE_ID || ''
       }), {
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          // Never cache: rotated keys must take effect immediately
+          'Cache-Control': 'no-store'
+        }
       });
     }
 
