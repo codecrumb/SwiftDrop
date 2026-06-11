@@ -724,15 +724,48 @@
       document.body.style.overflow = ''; // Restore scroll
     }
 
+    // Client config (Turnstile sitekey) is served from /api/config so key
+    // rotation never requires touching the static files.
+    const clientConfigPromise = fetch('/api/config')
+      .then((r) => r.json())
+      .catch(() => ({}));
+
+    let turnstileWidgetRendered = false;
+
+    function waitForTurnstileApi() {
+      return new Promise((resolve, reject) => {
+        if (window.turnstile) return resolve();
+        let waited = 0;
+        const timer = setInterval(() => {
+          if (window.turnstile) {
+            clearInterval(timer);
+            resolve();
+          } else if ((waited += 100) >= 10000) {
+            clearInterval(timer);
+            reject(new Error('Turnstile not available'));
+          }
+        }, 100);
+      });
+    }
+
+    async function ensureTurnstileWidget() {
+      if (turnstileWidgetRendered) return;
+      const { turnstileSiteKey } = await clientConfigPromise;
+      if (!turnstileSiteKey) throw new Error('Turnstile not configured');
+      await waitForTurnstileApi();
+      window.turnstile.render('#turnstileWidget', {
+        sitekey: turnstileSiteKey,
+        theme: 'light',
+        size: 'invisible',
+        callback: window.onTurnstileSuccess
+      });
+      turnstileWidgetRendered = true;
+    }
+
     // Turnstile helper functions
     async function getTurnstileToken() {
+      await ensureTurnstileWidget();
       return new Promise((resolve, reject) => {
-        if (!window.turnstile) {
-          console.error('Turnstile not loaded');
-          reject(new Error('Turnstile not available'));
-          return;
-        }
-
         try {
           // Execute Turnstile (invisible mode)
           window.turnstile.execute('#turnstileWidget', {
