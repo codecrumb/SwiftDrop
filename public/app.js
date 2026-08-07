@@ -1179,29 +1179,30 @@
 
         if (p2pTimeout) clearTimeout(p2pTimeout);
 
-        if (isSender) {
-          updateSendButton('p2p');
+        // The data channel is bidirectional: whichever side has staged
+        // content ready (file, URL, or text) needs its Send button refreshed,
+        // regardless of which side initiated the room (isSender).
+        updateSendButton('p2p');
 
-          if (urlInput.value.trim()) {
-            sendUrlBtn.disabled = false;
-            sendUrlBtn.textContent = 'Send URL (P2P)';
-          }
+        if (urlInput.value.trim()) {
+          sendUrlBtn.disabled = false;
+          sendUrlBtn.textContent = 'Send URL (P2P)';
+        }
 
-          if (textInput.value.trim()) {
-            sendTextBtn.disabled = false;
-            sendTextBtn.textContent = 'Send Text (P2P)';
-          }
+        if (textInput.value.trim()) {
+          sendTextBtn.disabled = false;
+          sendTextBtn.textContent = 'Send Text (P2P)';
+        }
 
-          // Nearby: auto-send if triggered from Nearby tab
-          if (nearbyAutoSendPending) {
-            const type = nearbyAutoSendPending;
-            nearbyAutoSendPending = null;
-            setTimeout(() => {
-              if (type === 'file') sendFile();
-              else if (type === 'url') sendUrl();
-              else if (type === 'text') sendText();
-            }, 100);
-          }
+        // Nearby: auto-send if triggered from Nearby tab
+        if (nearbyAutoSendPending) {
+          const type = nearbyAutoSendPending;
+          nearbyAutoSendPending = null;
+          setTimeout(() => {
+            if (type === 'file') sendFile();
+            else if (type === 'url') sendUrl();
+            else if (type === 'text') sendText();
+          }, 100);
         }
       };
 
@@ -1288,18 +1289,16 @@
       updateStatusBadge('relay', 'Cloud Relay Active');
       statusText.textContent = 'Connected via Cloud Relay';
 
-      if (isSender) {
-        updateSendButton('relay');
+      updateSendButton('relay');
 
-        if (urlInput.value.trim()) {
-          sendUrlBtn.disabled = false;
-          sendUrlBtn.textContent = 'Send URL (via Cloud)';
-        }
+      if (urlInput.value.trim()) {
+        sendUrlBtn.disabled = false;
+        sendUrlBtn.textContent = 'Send URL (via Cloud)';
+      }
 
-        if (textInput.value.trim()) {
-          sendTextBtn.disabled = false;
-          sendTextBtn.textContent = 'Send Text (via Cloud)';
-        }
+      if (textInput.value.trim()) {
+        sendTextBtn.disabled = false;
+        sendTextBtn.textContent = 'Send Text (via Cloud)';
       }
     }
     
