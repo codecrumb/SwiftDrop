@@ -15,7 +15,8 @@
     "r2:delete": "wrangler r2 bucket delete swiftdrop-files",
     "deployments": "wrangler deployments list",
     "whoami": "wrangler whoami",
-    "delete": "wrangler delete"
+    "delete": "wrangler delete",
+    "test": "vitest run"
   },
   "keywords": [
     "p2p",
@@ -29,6 +30,8 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.23.0",
+    "vitest": "^4.1.12",
     "wrangler": "^4.84.0"
   }
 }

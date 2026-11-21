@@ -416,3 +416,19 @@ Executed 2026-06-11 on branch `static-assets-migration` (6 commits, c3720b7..e44
 - Smoke: all endpoints 200; desktop + mobile headless screenshots styled correctly with room code visible (WS signaling works); no Turnstile console errors on load.
 - Deliberately NOT done: long-lived asset caching + version busting (no build step → manual busting is a footgun; default ETag revalidation is correct), method guard on /api/config (adjacent routes have none).
 - Deploy + post-deploy checks (HTTP→HTTPS redirect, real cloud upload) still pending user approval.
+
+---
+
+# Security headers + tests
+
+- [x] Add security headers + loose CSP to `public/_headers` (nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP allowing inline + cdnjs/unpkg/Turnstile)
+- [x] Add Vitest + `@cloudflare/vitest-pool-workers` (`npm test`, `vitest.config.mjs`, `test/worker.test.js`)
+- [x] Verify headers locally via `wrangler dev` (HTTP redirect already existed at worker.js:15)
+
+## Review
+
+- 13 tests pass: redirect, /api/config, upload cap/token/expiry/URL-scheme, WS guards, SignalingRoom, NearbyLobby.
+- Test config blanks TURNSTILE_SECRET / ALLOWED_ORIGINS so `.env.local` can't leak into tests.
+- Known, left alone: `SignalingRoom.webSocketClose` reports `peersCount` one low (getWebSockets() already excludes the closing socket); client ignores it, alarm is harmless. Fix = drop the `- 1`.
+- Known, left alone: `[observability.logs] enabled = false`, so analytics `console.log` events only show in live `wrangler tail`.
+- Not verified: CSP in a real browser (console errors); no CI wiring for tests (by request).
