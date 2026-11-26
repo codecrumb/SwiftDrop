@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#667eea" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1e1b4b" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f3f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141415" media="(prefers-color-scheme: dark)">
   <title>SwiftDrop - P2P File Transfer</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="https://faviconser.pages.dev/swiftdrop/favicon.ico">
@@ -21,22 +21,22 @@
 <body>
   <!-- Full-page drag overlay -->
   <div id="dragOverlay">
-    <div class="drag-overlay-icon">📁</div>
-    <div class="drag-overlay-text">Drop your file anywhere!</div>
-    <div class="drag-overlay-sub">Release to select this file</div>
+    <div class="drag-overlay-icon"><i data-feather="upload"></i></div>
+    <div class="drag-overlay-text">Drop to select files</div>
+    <div class="drag-overlay-sub">Release to add them</div>
   </div>
 
   <div class="container">
     <div class="left-panel">
-      <h1>🚀 SwiftDrop</h1>
-      <p class="subtitle">Instant P2P file transfer • Files auto-delete after download</p>
+      <h1>SwiftDrop</h1>
+      <p class="subtitle">Send files, links and text between devices. Files auto-delete after download.</p>
 
       <div class="status" id="status">
-        <div id="statusText">Generating room code...</div>
+        <div id="statusText">Generating code</div>
         <div class="room-code" id="roomCode">------</div>
         <div class="status-badge badge-waiting" id="statusBadge">
-          <span class="status-icon">⏳</span>
-          <span class="status-text">Waiting for peer...</span>
+          <span class="status-icon"></span>
+          <span class="status-text">Waiting for peer</span>
         </div>
       </div>
 
@@ -47,8 +47,8 @@
 
       <!-- Receive mode state (desktop only) -->
       <div class="left-receive-state" id="leftReceiveState" style="display:none;">
-        <div class="left-receive-icon">📡</div>
-        <div class="left-receive-title">Ready to Receive</div>
+        <div class="left-receive-icon"><i data-feather="radio"></i></div>
+        <div class="left-receive-title">Ready to receive</div>
         <div class="left-receive-sub">Enter the code from the sender's screen</div>
       </div>
 
@@ -63,74 +63,69 @@
 
     <div class="right-panel">
     <div class="role-selector">
-      <button class="role-btn active" id="sendRoleBtn">📤 Send</button>
-      <button class="role-btn nearby-tab-btn" id="nearbyRoleBtn" style="display:none;">📡 Nearby</button>
-      <button class="role-btn" id="receiveRoleBtn">📥 Receive</button>
+      <button class="role-btn active" id="sendRoleBtn"><i data-feather="upload"></i>Send</button>
+      <button class="role-btn nearby-tab-btn" id="nearbyRoleBtn" style="display:none;"><i data-feather="radio"></i>Nearby</button>
+      <button class="role-btn" id="receiveRoleBtn"><i data-feather="download"></i>Receive</button>
     </div>
     <p class="role-hint" id="roleHint">Share your room code with the other device</p>
     <div class="send-type-selector" id="sendTypeSelector">
-      <button class="send-type-btn active" id="sendModeBtn">📁 File</button>
-      <button class="send-type-btn" id="urlModeBtn">🔗 URL</button>
-      <button class="send-type-btn" id="textModeBtn">📋 Text</button>
+      <button class="send-type-btn active" id="sendModeBtn"><i data-feather="file"></i>File</button>
+      <button class="send-type-btn" id="urlModeBtn"><i data-feather="link"></i>URL</button>
+      <button class="send-type-btn" id="textModeBtn"><i data-feather="align-left"></i>Text</button>
     </div>
-    
+
     <!-- Send Mode -->
     <div class="section active" id="sendSection">
       <div class="upload-area" id="uploadArea">
-        <div class="upload-icon">📁</div>
-        <p><strong>Click or drag to select files</strong></p>
-        <p style="font-size: 12px; color: #999; margin-top: 5px;">Direct P2P transfer</p>
+        <div class="upload-icon"><i data-feather="upload"></i></div>
+        <p class="upload-title">Choose files or drop them here</p>
+        <p class="upload-sub">Sent directly between devices</p>
       </div>
       <input type="file" id="fileInput" multiple>
-      
+
       <div class="file-info" id="fileInfo">
         <div class="file-list" id="fileList"></div>
         <div class="file-name" id="fileName" style="display:none;"></div>
         <div class="file-size" id="fileSize" style="display:none;"></div>
       </div>
-      
-      <button class="btn btn-waiting" id="sendBtn" disabled>Waiting for receiver...</button>
+
+      <button class="btn btn-waiting" id="sendBtn" disabled>Waiting for receiver</button>
     </div>
-    
+
     <!-- URL Mode -->
     <div class="section" id="urlSection">
-      <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter URL to share:</p>
-      <div style="display: flex; gap: 8px; margin-bottom: 15px;">
-        <input type="url" id="urlInput" placeholder="https://example.com" inputmode="url"
-               style="flex: 1; text-transform: none; letter-spacing: normal; margin-bottom: 0;">
-        <button id="pasteUrlBtn" class="paste-btn">
-          📋 Paste
-        </button>
+      <p class="section-label">URL to share</p>
+      <div class="field-row">
+        <input type="url" id="urlInput" placeholder="https://example.com" inputmode="url">
+        <button id="pasteUrlBtn" class="paste-btn"><i data-feather="clipboard"></i>Paste</button>
       </div>
-      <button class="btn btn-waiting" id="sendUrlBtn" disabled>Waiting for receiver...</button>
-      <p style="margin-top: 10px; font-size: 12px; color: #999; text-align: center;">
-        Receiver will be redirected to this URL
-      </p>
+      <button class="btn btn-waiting" id="sendUrlBtn" disabled>Waiting for receiver</button>
+      <p class="section-note">The receiver is redirected to this URL</p>
     </div>
-    
+
     <!-- Text Mode -->
     <div class="section" id="textSection">
-      <p style="margin-bottom: 10px; color: var(--text-secondary); font-size: 14px;">Paste or type text to share:</p>
-      <textarea class="text-input" id="textInput" placeholder="Paste your text here (env vars, snippets, notes...)"></textarea>
-      <div style="display: flex; gap: 8px; margin-top: 8px;">
-        <button id="pasteTextBtn" class="paste-btn" style="flex: 1;">📋 Paste</button>
-        <button id="clearTextBtn" class="paste-btn" style="flex: 1;">✕ Clear</button>
+      <p class="section-label">Text to share</p>
+      <textarea class="text-input" id="textInput" placeholder="Env vars, snippets, notes"></textarea>
+      <div class="field-row field-row-tight">
+        <button id="pasteTextBtn" class="paste-btn"><i data-feather="clipboard"></i>Paste</button>
+        <button id="clearTextBtn" class="paste-btn"><i data-feather="x"></i>Clear</button>
       </div>
-      <button class="btn btn-waiting" id="sendTextBtn" disabled style="margin-top: 10px;">Waiting for receiver...</button>
+      <button class="btn btn-waiting" id="sendTextBtn" disabled>Waiting for receiver</button>
     </div>
 
     <!-- Nearby Mode -->
     <div class="section" id="nearbySection">
       <div class="nearby-identity-row">
-        <span class="nearby-identity-label">You appear as:</span>
+        <span class="nearby-identity-label">You appear as</span>
         <span class="nearby-identity-name" id="nearbyIdentityName" title="Tap to rename"></span>
         <input type="text" id="nearbyIdentityInput" class="nearby-identity-input" maxlength="30" style="display:none;">
       </div>
       <div class="nearby-peer-list" id="nearbyPeerList">
         <div class="nearby-empty" id="nearbyEmpty">
-          <div style="font-size:32px; margin-bottom:8px;">📡</div>
-          <div style="font-weight:600; margin-bottom:4px;">Looking for devices…</div>
-          <div style="font-size:13px; color:var(--text-secondary);">Other devices on this network will appear here</div>
+          <div class="nearby-empty-icon"><i data-feather="radio"></i></div>
+          <div class="nearby-empty-title">Looking for devices</div>
+          <div class="nearby-empty-sub">Other devices on this network will appear here</div>
         </div>
       </div>
     </div>
@@ -138,41 +133,41 @@
     <!-- Receive Mode -->
     <div class="section" id="receiveSection">
       <div id="receiveJoinForm">
-        <p style="margin-bottom: 10px; color: #666; font-size: 14px;">Enter the 6-digit code from sender:</p>
+        <p class="section-label">Enter the 6-digit code from the sender</p>
         <input type="text" id="roomInput" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]*">
-        <button class="btn" id="joinBtn">Join Room</button>
+        <button class="btn" id="joinBtn">Join room</button>
       </div>
-      <div id="receiveJoinedState" style="display:none; text-align:center; padding: 12px 0;">
-        <div style="font-size: 28px; margin-bottom: 8px;">📡</div>
-        <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">Connected to room <span id="receiveJoinedCode"></span></div>
-        <div style="font-size: 13px; color: #888;">Waiting for sender to transfer files…</div>
-        <button id="changeRoomBtn" style="margin-top: 10px; background: none; border: none; color: #888; font-size: 12px; cursor: pointer; text-decoration: underline; padding: 0;">Wrong room? Change</button>
+      <div class="joined-state" id="receiveJoinedState" style="display:none;">
+        <div class="joined-icon"><i data-feather="radio"></i></div>
+        <div class="joined-title">Connected to room <span class="joined-code" id="receiveJoinedCode"></span></div>
+        <div class="joined-sub">Waiting for the sender to transfer files</div>
+        <button id="changeRoomBtn" class="btn-link">Wrong room? Change</button>
       </div>
     </div>
-    
+
     <div class="progress" id="progress">
       <div class="progress-bar">
         <div class="progress-fill" id="progressFill"></div>
       </div>
-      <div class="progress-text" id="progressText">Transferring...</div>
+      <div class="progress-text" id="progressText">Transferring</div>
     </div>
-    
+
     <!-- Receive success panel (replaces right panel on transfer complete) -->
     <div class="receive-success" id="receiveSuccessPanel">
-      <div class="success-icon" id="successIcon">📦</div>
-      <div class="success-title" id="successTitle">File Ready!</div>
+      <div class="success-icon" id="successIcon"><i data-feather="check"></i></div>
+      <div class="success-title" id="successTitle">File ready</div>
       <div class="success-meta" id="successMeta"></div>
       <!-- File: download button(s) — populated dynamically -->
       <div class="success-actions" id="successFileActions" style="display:none;"></div>
       <!-- Text: textarea + copy -->
       <div class="success-actions" id="successTextActions" style="display:none;">
         <textarea class="success-textarea" id="successTextDisplay" readonly></textarea>
-        <button class="btn" id="successCopyBtn">📋 Copy to Clipboard</button>
+        <button class="btn" id="successCopyBtn"><i data-feather="copy"></i>Copy to clipboard</button>
       </div>
       <div class="telehost-promo" id="telehostPromo" style="width:100%;">
-        Need permanent file hosting? Try <a href="https://telehost.pages.dev" target="_blank" rel="noopener">TeleHost</a> — free &amp; forever.
+        Need permanent hosting? Try <a href="https://telehost.pages.dev" target="_blank" rel="noopener">TeleHost</a>
       </div>
-      <button class="btn-reset" id="successResetBtn">↩ Transfer Another</button>
+      <button class="btn-reset" id="successResetBtn"><i data-feather="rotate-ccw"></i>Transfer another</button>
     </div>
 
     <div class="error" id="error"></div>
@@ -196,16 +191,13 @@
     <p class="popup-modal-body" id="popupModalDesc">Your browser blocked a new tab from opening. Click <strong>Retry</strong> to open it.</p>
     <div class="popup-modal-actions">
       <button class="popup-modal-retry" id="popupRetry">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
-          <polyline points="1 4 1 10 7 10"></polyline>
-          <path d="M3.51 15a9 9 0 1 0 .49-3.7"></path>
-        </svg>
+        <i data-feather="rotate-ccw"></i>
         Retry
       </button>
       <button class="popup-modal-cancel" id="popupCancel">Cancel</button>
     </div>
     <div class="popup-modal-footer">
-      Tired of seeing this? <a href="/help/popups" target="_blank" rel="noopener">Adjust browser settings →</a>
+      <a href="/help/popups" target="_blank" rel="noopener">Adjust browser settings</a>
     </div>
   </div>
 
@@ -216,7 +208,7 @@
   <!-- Settings Modal -->
   <div class="settings-modal" id="settingsModal">
     <div class="settings-modal-content">
-      <button class="settings-modal-close" id="settingsModalClose">✕</button>
+      <button class="settings-modal-close" id="settingsModalClose" title="Close"><i data-feather="x"></i></button>
       <div class="settings-modal-title">Settings</div>
       <div class="settings-row">
         <div class="settings-label">
@@ -241,7 +233,7 @@
       <div class="settings-row">
         <div class="settings-label">
           <span>Auto-join on code entry</span>
-          <span class="settings-desc">Automatically join when the 6th digit is typed (no need to tap Join)</span>
+          <span class="settings-desc">Join when the 6th digit is typed, without tapping Join</span>
         </div>
         <label class="settings-toggle">
           <input type="checkbox" id="autoJoinToggle">
@@ -259,11 +251,11 @@
         </label>
       </div>
       <div class="settings-section-header">
-        Nearby Devices <span class="settings-beta-badge">Beta</span>
+        Nearby devices <span class="settings-beta-badge">beta</span>
       </div>
       <div class="settings-row">
         <div class="settings-label">
-          <span>Enable Nearby Discovery</span>
+          <span>Enable nearby discovery</span>
           <span class="settings-desc">Find devices on the same network without a room code</span>
         </div>
         <label class="settings-toggle">
@@ -279,16 +271,15 @@
           </div>
           <div class="nearby-name-edit">
             <span id="nearbyNameDisplay"></span>
-            <button class="nearby-edit-btn" id="nearbyEditNameBtn" title="Edit name"><i data-feather="edit-2" style="width:14px;height:14px;stroke-width:2.5;pointer-events:none;"></i></button>
+            <button class="nearby-edit-btn" id="nearbyEditNameBtn" title="Edit name"><i data-feather="edit-2"></i></button>
           </div>
         </div>
         <div class="settings-row" id="nearbyNameInputRow" style="display:none;">
-          <input type="text" id="nearbyNameInput" maxlength="30" placeholder="Enter device name"
-                 style="flex:1; margin:0; font-size:14px;">
+          <input type="text" id="nearbyNameInput" maxlength="30" placeholder="Device name">
           <button class="nearby-edit-btn" id="nearbyNameSaveBtn">Save</button>
         </div>
         <div class="settings-row settings-label" id="nearbyTrustedHeader" style="display:none;">
-          <span style="font-weight:600;">Trusted Devices</span>
+          <span>Trusted devices</span>
         </div>
         <div id="nearbyTrustedList"></div>
       </div>
@@ -304,20 +295,20 @@
   <!-- QR Code Modal -->
   <div class="qr-modal" id="qrModal">
     <div class="qr-modal-content">
-      <button class="qr-modal-close" id="qrModalClose">✕</button>
+      <button class="qr-modal-close" id="qrModalClose" title="Close"><i data-feather="x"></i></button>
       <div class="qr-modal-title">Join this room</div>
       <div class="qr-modal-room-code" id="modalRoomCode">------</div>
       <div class="qr-modal-qr">
         <div id="qrcode"></div>
       </div>
-      <div class="qr-modal-instructions">Scan to join instantly</div>
+      <div class="qr-modal-instructions">Scan to join</div>
     </div>
   </div>
 
   <!-- Nearby: Incoming Transfer Request Modal -->
   <div class="nearby-request-modal" id="nearbyRequestModal" style="display:none;">
     <div class="nearby-request-content">
-      <div class="nearby-request-icon">📡</div>
+      <div class="nearby-request-icon"><i data-feather="radio"></i></div>
       <div class="nearby-request-from" id="nearbyRequestFrom"></div>
       <div class="nearby-request-file" id="nearbyRequestFile"></div>
       <div class="nearby-request-size" id="nearbyRequestSize"></div>
@@ -330,16 +321,11 @@
 
   <!-- Cookie Consent Banner -->
   <div class="cookie-banner" id="cookieBanner">
-    <div class="cookie-banner-content">
-      <div class="cookie-banner-icon">🍪</div>
-      <div class="cookie-banner-text">
-        <div class="cookie-banner-title">Cookie Notice</div>
-        <div class="cookie-banner-message">
-          We use cookies for Turnstile verification to protect against bots. By continuing to use SwiftDrop, you accept our use of cookies.
-        </div>
-        <button class="cookie-banner-close" id="cookieBannerClose">Got it!</button>
-      </div>
+    <div class="cookie-banner-title">Cookies</div>
+    <div class="cookie-banner-message">
+      SwiftDrop uses cookies for Turnstile bot verification. By continuing, you accept them.
     </div>
+    <button class="cookie-banner-close" id="cookieBannerClose">Accept</button>
   </div>
 
   <script src="/app.js"></script>

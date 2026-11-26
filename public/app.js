@@ -76,6 +76,16 @@
     // ─────────────────────────────────────────────────────────────────────
 
     // Escape untrusted strings (peer names, file names) before innerHTML use
+    // Put a feather icon (and optional label) into an element; label goes in as text, never HTML
+    function setIcon(el, name, label) {
+      el.textContent = '';
+      const i = document.createElement('i');
+      i.setAttribute('data-feather', name);
+      el.appendChild(i);
+      if (label) el.appendChild(document.createTextNode(label));
+      feather.replace();
+    }
+
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, (c) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -186,7 +196,7 @@
         item.className = 'nearby-trusted-item';
         const daysAgo = Math.floor((Date.now() - t.trustedAt) / 86400000);
         item.innerHTML = `
-          <span>${escapeHtml(t.displayName)} <span style="color:var(--text-secondary);font-size:12px;">· trusted ${daysAgo === 0 ? 'today' : daysAgo + 'd ago'}</span></span>
+          <span>${escapeHtml(t.displayName)} <span class="settings-desc">· trusted ${daysAgo === 0 ? 'today' : daysAgo + 'd ago'}</span></span>
           <button class="nearby-trusted-remove" data-id="${escapeHtml(t.deviceId)}">Remove</button>
         `;
         item.querySelector('button').addEventListener('click', () => {
@@ -423,7 +433,7 @@
       receiveJoinForm.style.display = 'none';
       receiveJoinedState.style.display = '';
       receiveJoinedCode.textContent = code;
-      leftReceiveState.querySelector('.left-receive-sub').textContent = 'Waiting for sender to transfer files…';
+      leftReceiveState.querySelector('.left-receive-sub').textContent = 'Waiting for the sender to transfer files';
     }
 
     // Show receive success panel (replaces right panel content)
@@ -444,8 +454,8 @@
 
       if (type === 'files') {
         const files = Array.isArray(data) ? data : [data];
-        successIcon.textContent = '📦';
-        successTitle.textContent = files.length === 1 ? 'File Ready!' : `${files.length} Files Ready!`;
+        setIcon(successIcon, 'check');
+        successTitle.textContent = files.length === 1 ? 'File ready' : `${files.length} files ready`;
         successMeta.textContent = '';
         successFileActions.innerHTML = '';
         files.forEach(({ fileName: fn, url }) => {
@@ -453,13 +463,13 @@
           a.href = url;
           a.download = fn;
           a.className = 'btn';
-          a.textContent = `⬇ ${fn}`;
+          setIcon(a, 'download', fn);
           successFileActions.appendChild(a);
         });
         if (files.length > 1) {
           const dlAll = document.createElement('button');
           dlAll.className = 'btn';
-          dlAll.textContent = '⬇ Download All';
+          setIcon(dlAll, 'download', 'Download all');
           dlAll.addEventListener('click', () => {
             successFileActions.querySelectorAll('a.btn').forEach(a => a.click());
           });
@@ -477,13 +487,13 @@
           });
         }
       } else if (type === 'text') {
-        successIcon.textContent = '📋';
-        successTitle.textContent = 'Text Received!';
+        setIcon(successIcon, 'clipboard');
+        successTitle.textContent = 'Text received';
         successMeta.textContent = '';
         successTextDisplay.value = data.content;
         successTextActions.style.display = 'flex';
         if (localStorage.getItem('autoCopyText') !== 'false') {
-          navigator.clipboard.writeText(data.content).then(() => showToast('Text copied to clipboard!'));
+          navigator.clipboard.writeText(data.content).then(() => showToast('Text copied to clipboard'));
         }
       }
 
@@ -519,7 +529,7 @@
     // Copy button in success panel
     successCopyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(successTextDisplay.value).then(() => {
-        showToast('Copied to clipboard!');
+        showToast('Copied to clipboard');
       });
     });
 
@@ -616,7 +626,6 @@
     // Helper function to update status badge
     function updateStatusBadge(state, message) {
       const badge = statusBadge;
-      const icon = badge.querySelector('.status-icon');
       const text = badge.querySelector('.status-text');
 
       // Remove all badge classes
@@ -626,27 +635,23 @@
       switch(state) {
         case 'waiting':
           badge.classList.add('badge-waiting');
-          icon.textContent = '⏳';
-          text.textContent = message || 'Waiting for peer...';
+          text.textContent = message || 'Waiting for peer';
           break;
         case 'connecting':
           badge.classList.add('badge-connecting');
           status.classList.add('connecting');
-          icon.textContent = '🔄';
-          text.textContent = message || 'Connecting...';
+          text.textContent = message || 'Connecting';
           break;
         case 'p2p':
           badge.classList.add('badge-p2p');
           status.classList.add('connected');
           roomCodeEl.classList.add('connected');
-          icon.textContent = '✅';
-          text.textContent = message || 'P2P Connected';
+          text.textContent = message || 'Connected directly';
           break;
         case 'relay':
           badge.classList.add('badge-relay');
           status.classList.add('relay');
-          icon.textContent = '☁️';
-          text.textContent = message || 'Cloud Relay Active';
+          text.textContent = message || 'Using cloud relay';
           break;
       }
     }
@@ -662,7 +667,7 @@
         case 'waiting':
           sendBtn.classList.add('btn-waiting');
           sendBtn.disabled = true;
-          sendBtn.textContent = 'Waiting for receiver...';
+          sendBtn.textContent = 'Waiting for receiver';
           break;
         case 'connecting':
           // Gray but clickable - allows skipping P2P attempt
@@ -697,7 +702,7 @@
         text: fullUrl,
         width: 220,
         height: 220,
-        colorDark: '#667eea',
+        colorDark: '#1c1b19',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
       });
@@ -707,7 +712,7 @@
         text: fullUrl,
         width: 148,
         height: 148,
-        colorDark: '#667eea',
+        colorDark: '#1c1b19',
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
       });
@@ -848,7 +853,7 @@
 
         if (result.valid) {
           urlInput.value = result.url;
-          showToast('URL pasted and validated!');
+          showToast('URL pasted');
 
           // Enable send button if connected
           if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
@@ -881,8 +886,8 @@
         roomCode = autoJoinRoom.toUpperCase();
         roomCodeEl.textContent = roomCode;
         connectWebSocket(roomCode);
-        statusText.textContent = 'Joining room...';
-        showToast('Joining room ' + roomCode + '...');
+        statusText.textContent = 'Joining room';
+        showToast('Joining room ' + roomCode);
 
         activateReceiveJoined(roomCode);
       } else {
@@ -939,10 +944,10 @@
         }, 25000);
 
         if (isReconnect) {
-          statusText.textContent = 'Reconnected!';
-          showToast('Connection restored!');
+          statusText.textContent = 'Reconnected';
+          showToast('Connection restored');
         } else {
-          statusText.textContent = isSender ? 'Share this code with receiver:' : 'Connected to room:';
+          statusText.textContent = isSender ? 'Share this code with the receiver' : 'Connected to room';
         }
       };
 
@@ -974,8 +979,8 @@
         const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts - 1), 16000); // 1s, 2s, 4s, 8s, 16s
 
         console.log(`🔄 Reconnecting in ${delay/1000}s (attempt ${wsReconnectAttempts}/5)...`);
-        statusText.textContent = `Reconnecting in ${delay/1000}s...`;
-        showToast(`Connection lost. Reconnecting (attempt ${wsReconnectAttempts}/5)...`);
+        statusText.textContent = `Reconnecting in ${delay/1000}s`;
+        showToast(`Connection lost. Reconnecting (attempt ${wsReconnectAttempts}/5)`);
 
         wsReconnectTimeout = setTimeout(() => {
           console.log(`🔄 Attempting reconnect ${wsReconnectAttempts}/5`);
@@ -995,8 +1000,8 @@
           
         case 'peer-joined':
           updateStatusBadge('connecting', 'Connecting...');
-          statusText.textContent = 'Peer connected! Establishing connection...';
-          showToast('Peer joined! Connecting...');
+          statusText.textContent = 'Peer connected. Establishing connection';
+          showToast('Peer joined');
 
           if (isSender) {
             // Update button to gray/clickable state (allows skipping P2P)
@@ -1175,7 +1180,7 @@
         console.log('✅ Data channel open');
         isP2PConnected = true;
         updateStatusBadge('p2p', 'P2P Connected');
-        statusText.textContent = 'Ready for P2P transfer!';
+        statusText.textContent = 'Ready to transfer';
 
         if (p2pTimeout) clearTimeout(p2pTimeout);
 
@@ -1212,7 +1217,7 @@
           
           // Handle URL message
           if (data.type === 'url') {
-            statusText.textContent = '🔗 Received URL!';
+            statusText.textContent = 'Received URL';
             const _tab = window.open(data.url, '_blank');
             if (!_tab) showPopupBlockedModal(data.url);
             return;
@@ -1265,7 +1270,7 @@
           
           const percent = (receivedSize / totalSize) * 100;
           progressFill.style.width = percent + '%';
-          progressText.textContent = `Receiving... ${Math.round(percent)}%`;
+          progressText.textContent = `Receiving ${Math.round(percent)}%`;
           
           if (receivedSize >= totalSize) {
             downloadReceivedFile();
@@ -1379,8 +1384,8 @@
 
       transferInProgress = false;
       releaseWakeLock();
-      progressText.textContent = '✅ Transfer complete!';
-      showToast(selectedFiles.length === 1 ? 'File sent successfully!' : `${selectedFiles.length} files sent!`);
+      progressText.textContent = 'Transfer complete';
+      showToast(selectedFiles.length === 1 ? 'File sent' : `${selectedFiles.length} files sent`);
       telehostPromo.style.display = 'block';
       setTimeout(() => {
         progress.style.display = 'none';
@@ -1470,8 +1475,8 @@
 
         transferInProgress = false;
         releaseWakeLock();
-        progressText.textContent = '✅ Uploaded! Links sent.';
-        showToast(selectedFiles.length === 1 ? 'File uploaded! Link sent to receiver.' : `${selectedFiles.length} files uploaded!`);
+        progressText.textContent = 'Uploaded. Links sent';
+        showToast(selectedFiles.length === 1 ? 'File uploaded. Link sent to receiver' : `${selectedFiles.length} files uploaded`);
 
         setTimeout(() => {
           progress.style.display = 'none';
@@ -1511,31 +1516,31 @@
       receivedFileCount++;
 
       if (receivedFileCount >= pendingFileCount) {
-        statusText.textContent = receivedFiles.length === 1 ? 'File ready for download!' : 'All files ready!';
-        showToast(receivedFiles.length === 1 ? 'File received via Cloud Relay!' : `${receivedFiles.length} files received!`);
+        statusText.textContent = receivedFiles.length === 1 ? 'File ready for download' : 'All files ready';
+        showToast(receivedFiles.length === 1 ? 'File received via cloud relay' : `${receivedFiles.length} files received`);
         showReceiveSuccess('files', receivedFiles);
         pendingFileCount = 0;
         receivedFileCount = 0;
       } else {
-        statusText.textContent = `Received ${receivedFileCount}/${pendingFileCount} files...`;
+        statusText.textContent = `Received ${receivedFileCount}/${pendingFileCount} files`;
         showToast(`File ${receivedFileCount}/${pendingFileCount} received`);
       }
     }
 
     function handleUrlFallback(data) {
-      statusText.textContent = '🔗 Received URL (via cloud)!';
+      statusText.textContent = 'Received URL via cloud';
       const _tab = window.open(data.redirectUrl, '_blank');
       if (!_tab) showPopupBlockedModal(data.redirectUrl);
     }
 
     function handleTextFallback(data) {
       showReceivedText(data.content);
-      statusText.textContent = '📋 Text received via Cloud!';
-      showToast('Text received!');
+      statusText.textContent = 'Text received via cloud';
+      showToast('Text received');
     }
 
     function showReceivedText(content) {
-      statusText.textContent = '📋 Text received!';
+      statusText.textContent = 'Text received';
       showToast('Text received!');
       showReceiveSuccess('text', { content });
     }
@@ -1551,8 +1556,8 @@
 
       if (isP2PConnected && dataChannel && dataChannel.readyState === 'open') {
         dataChannel.send(JSON.stringify({ type: 'text', content }));
-        statusText.textContent = '✅ Text sent via P2P!';
-        showToast('Text sent!');
+        statusText.textContent = 'Text sent via P2P';
+        showToast('Text sent');
         setTimeout(() => {
           sendTextBtn.disabled = false;
           textInput.value = '';
@@ -1560,7 +1565,7 @@
       } else if (ws && ws.readyState === WebSocket.OPEN) {
         // Send directly via signaling relay — text is tiny, no R2 needed
         ws.send(JSON.stringify({ type: 'text-fallback', content }));
-        statusText.textContent = '✅ Text sent via Cloud!';
+        statusText.textContent = 'Text sent via cloud';
         showToast('Text sent!');
         setTimeout(() => {
           sendTextBtn.disabled = false;
@@ -1584,8 +1589,8 @@
       if (receivedFileCount >= pendingFileCount) {
         transferInProgress = false;
         releaseWakeLock();
-        statusText.textContent = receivedFiles.length === 1 ? '✅ File ready!' : '✅ All files ready!';
-        showToast(receivedFiles.length === 1 ? 'File received!' : `${receivedFiles.length} files received!`);
+        statusText.textContent = receivedFiles.length === 1 ? 'File ready' : 'All files ready';
+        showToast(receivedFiles.length === 1 ? 'File received' : `${receivedFiles.length} files received!`);
         showReceiveSuccess('files', receivedFiles);
         pendingFileCount = 0;
         receivedFileCount = 0;
@@ -1625,8 +1630,8 @@
           url: url
         }));
 
-        statusText.textContent = '✅ URL sent via P2P!';
-        showToast('URL shared successfully!');
+        statusText.textContent = 'URL sent via P2P';
+        showToast('URL shared');
 
         setTimeout(() => {
           sendUrlBtn.disabled = false;
@@ -1636,7 +1641,7 @@
         // Use R2 fallback
         try {
           progress.style.display = 'block';
-          progressText.textContent = 'Verifying...';
+          progressText.textContent = 'Verifying';
 
           // Get Turnstile token for bot protection
           let token;
@@ -1650,7 +1655,7 @@
             return;
           }
 
-          progressText.textContent = 'Uploading URL...';
+          progressText.textContent = 'Uploading URL';
 
           const urlId = crypto.randomUUID();
           const timestamp = Date.now();
@@ -1680,7 +1685,7 @@
 
           if (result.success) {
             progressFill.style.width = '100%';
-            progressText.textContent = '✅ URL uploaded!';
+            progressText.textContent = 'URL uploaded';
 
             // Send URL redirect link to receiver via signaling
             ws.send(JSON.stringify({
@@ -1689,7 +1694,7 @@
               redirectUrl: '/url-redirect/' + urlId
             }));
 
-            showToast('URL shared via Cloud Relay!');
+            showToast('URL shared via cloud relay');
 
             setTimeout(() => {
               progress.style.display = 'none';
@@ -1759,7 +1764,7 @@
     document.getElementById('popupOverlay').addEventListener('click', hidePopupBlockedModal);
     
     function showError(message) {
-      errorDiv.textContent = '❌ ' + message;
+      errorDiv.textContent = message;
       errorDiv.style.display = 'block';
       setTimeout(() => {
         errorDiv.style.display = 'none';
@@ -1783,7 +1788,7 @@
 
     qrInlineWrapper.addEventListener('click', () => {
       const url = window.location.origin + window.location.pathname + '?room=' + roomCode;
-      navigator.clipboard.writeText(url).then(() => showToast('Link copied!')).catch(() => showToast('Copy failed'));
+      navigator.clipboard.writeText(url).then(() => showToast('Link copied')).catch(() => showToast('Copy failed'));
     });
 
     // QR Modal - Click outside to close
@@ -2044,7 +2049,7 @@
         item.innerHTML = `
           <div>
             <span class="nearby-peer-name">${escapeHtml(peer.displayName)}</span>
-            ${trusted ? '<span class="nearby-peer-trusted">✓ Trusted</span>' : ''}
+            ${trusted ? '<span class="nearby-peer-trusted">Trusted</span>' : ''}
           </div>
           <span class="nearby-peer-status">Tap to send</span>
         `;
@@ -2136,7 +2141,7 @@
 
       // Update peer item to show "Waiting…"
       const item = nearbyPeerList.querySelector(`[data-device-id="${peer.deviceId}"]`);
-      if (item) item.querySelector('.nearby-peer-status').textContent = 'Waiting…';
+      if (item) item.querySelector('.nearby-peer-status').textContent = 'Waiting';
 
       nearbyWs.send(JSON.stringify({
         type: 'send-request',
@@ -2257,14 +2262,14 @@
       const toastEl = document.getElementById('toast');
       toastEl.innerHTML = `
         Trust <strong>${escapeHtml(displayName)}</strong>? Skip confirmation next time.
-        <button id="nearbyTrustYes" style="margin-left:10px;background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:13px;">Trust</button>
+        <button id="nearbyTrustYes" class="toast-action">Trust</button>
       `;
       toastEl.style.display = 'flex';
       toastEl.style.alignItems = 'center';
       toastEl.classList.add('show');
       document.getElementById('nearbyTrustYes').addEventListener('click', () => {
         nearbyTrustDevice(deviceId, displayName);
-        showToast(`${displayName} trusted!`);
+        showToast(`${displayName} trusted`);
       });
       setTimeout(() => toastEl.classList.remove('show'), 8000);
     }
@@ -2370,7 +2375,7 @@
     // Drag and drop support (small upload area still works too)
     uploadArea.addEventListener('dragover', (e) => {
       e.preventDefault();
-      uploadArea.style.borderColor = '#667eea';
+      uploadArea.style.borderColor = 'var(--accent)';
       uploadArea.style.background = 'var(--upload-area-hover)';
     });
 
@@ -2474,7 +2479,7 @@
         }
         textInput.value = text;
         textInput.dispatchEvent(new Event('input'));
-        showToast('Pasted from clipboard!');
+        showToast('Pasted from clipboard');
       } catch (e) {
         showError('Could not access clipboard. Please paste manually (Ctrl+V / Cmd+V).');
       }
@@ -2507,7 +2512,7 @@
       }
 
       connectWebSocket(code);
-      statusText.textContent = 'Connecting to room...';
+      statusText.textContent = 'Connecting to room';
 
       // Receivers don't get clickable status
       status.classList.remove('clickable');
@@ -2570,12 +2575,12 @@
             urlModeBtn.click();
             urlInput.value = text;
             urlInput.dispatchEvent(new Event('input'));
-            showToast('URL pasted!');
+            showToast('URL pasted');
           } else {
             textModeBtn.click();
             textInput.value = text;
             textInput.dispatchEvent(new Event('input'));
-            showToast('Text pasted!');
+            showToast('Text pasted');
           }
         });
       }
